@@ -1,0 +1,57 @@
+name: FlowOSS
+
+options:
+  bundleIdPrefix: app.flowoss
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEAD_CODE_STRIPPING: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+packages:
+  FlowKit:
+    path: Packages/FlowKit
+
+targets:
+  FlowOSS:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+      - App/Resources/Assets.xcassets
+    info:
+      path: App/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: GingerPaw
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: false
+        NSMicrophoneUsageDescription: "GingerPaw records your voice so it can transcribe dictation locally."
+        NSHumanReadableCopyright: "© 2026 FlowOSS contributors"
+    dependencies:
+      - package: FlowKit
+        product: AppCore
+
+schemes:
+  FlowOSS:
+    build:
+      targets:
+        FlowOSS: all
+    run:
+      config: Debug
+    test:
+      config: Debug

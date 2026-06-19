@@ -1,0 +1,21 @@
+# Build output
+.build/
+dd/
+DerivedData/
+*.o
+
+# Generated Xcode project (source of truth is project.yml + xcodegen)
+*.xcodeproj/
+.swiftpm/
+
+# Distribution artifacts (built apps, dmgs)
+dist/
+
+# Downloaded / test model caches (never commit weights)
+models/
+*.mlmodelc/
+*.safetensors
+
+# macOS
+.DS_Store
+*.xcuserstate
