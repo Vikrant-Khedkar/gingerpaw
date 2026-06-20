@@ -17,7 +17,25 @@ public actor WhisperKitTranscriber: SpeechTranscriber {
         let modelID = await modelIDProvider()
         let pipe = try await loadPipeline(modelID: modelID)
         let results = try await pipe.transcribe(audioPath: audioURL.path)
-        return results.map(\.text).joined(separator: " ")
+        return Self.stripNonSpeech(results.map(\.text).joined(separator: " "))
+    }
+
+    /// WhisperKit emits non-speech markers like `[BLANK_AUDIO]`, `(silence)`, `[MUSIC]`
+    /// for silence/noise. Strip them so an empty utterance doesn't paste a literal token.
+    private static func stripNonSpeech(_ text: String) -> String {
+        var result = text
+        let markers = [
+            "\\[BLANK_AUDIO\\]", "\\[ *silence *\\]", "\\( *silence *\\)",
+            "\\[ *inaudible *\\]", "\\( *inaudible *\\)", "\\[ *pause *\\]",
+            "\\[ *music *\\]", "\\( *music *\\)", "\\[ *no_?speech *\\]",
+            "\\[ *applause *\\]", "\\( *applause *\\)",
+        ]
+        for marker in markers {
+            result = result.replacingOccurrences(
+                of: marker, with: "", options: [.regularExpression, .caseInsensitive]
+            )
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func loadPipeline(modelID: String) async throws -> WhisperKit {

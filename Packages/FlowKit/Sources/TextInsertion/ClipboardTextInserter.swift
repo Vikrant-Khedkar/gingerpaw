@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Foundation
 
 public struct ClipboardSnapshot: Sendable {
@@ -15,6 +16,12 @@ public final class ClipboardTextInserter: TextInserter, @unchecked Sendable {
     }
 
     public func insert(_ text: String, restoreClipboard: Bool) async -> InsertionOutcome {
+        // No editable text field focused? Don't paste into nothing — leave it on the
+        // clipboard so the user can paste it themselves, and report .copied.
+        guard Self.focusedElementIsEditable() else {
+            setClipboard(text)
+            return .copied
+        }
         let snapshot = snapshot()
         setClipboard(text)
         let pasted = sendPaste()
@@ -23,6 +30,32 @@ public final class ClipboardTextInserter: TextInserter, @unchecked Sendable {
             restore(snapshot)
         }
         return pasted ? .pasted : .copied
+    }
+
+    /// Whether the system-wide focused UI element accepts typed text (so ⌘V will land).
+    private static func focusedElementIsEditable() -> Bool {
+        let system = AXUIElementCreateSystemWide()
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let element = focused, CFGetTypeID(element) == AXUIElementGetTypeID()
+        else { return false }
+        let el = element as! AXUIElement
+
+        var role: CFTypeRef?
+        AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &role)
+        let editableRoles: Set<String> = [
+            kAXTextFieldRole as String, kAXTextAreaRole as String, kAXComboBoxRole as String,
+        ]
+        if let roleString = role as? String, editableRoles.contains(roleString) {
+            return true
+        }
+
+        // Fallback for custom/editable views: is the value attribute writable?
+        var settable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(el, kAXValueAttribute as CFString, &settable) == .success {
+            return settable.boolValue
+        }
+        return false
     }
 
     public func copy(_ text: String) async -> InsertionOutcome {

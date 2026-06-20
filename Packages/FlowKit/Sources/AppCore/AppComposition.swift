@@ -22,20 +22,31 @@ public struct AppServices {
 public enum AppComposition {
     public static func make() -> AppServices {
         let settings = FlowSettings()
-        let coordinator = DictationCoordinator(
-            recorder: AudioRecorder(),
-            transcriber: WhisperKitTranscriber {
+        let transcriber = RoutingTranscriber(
+            whisperKit: WhisperKitTranscriber {
                 await MainActor.run { settings.modelID }
             },
+            moonshine: MoonshineTranscriber {
+                await MainActor.run { settings.moonshineModel.rawValue }
+            },
+            engineProvider: {
+                await MainActor.run { settings.engine }
+            }
+        )
+        let coordinator = DictationCoordinator(
+            recorder: AudioRecorder(),
+            transcriber: transcriber,
             inserter: ClipboardTextInserter(),
             settings: settings,
             processor: MLXTextProcessor()
         )
+        let hotkeyMonitor = RightOptionHotkeyMonitor()
+        hotkeyMonitor.hotkeyProvider = { settings.hotkey }
         return AppServices(
             settings: settings,
             permissions: PermissionCenter(),
             coordinator: coordinator,
-            hotkeyMonitor: RightOptionHotkeyMonitor(),
+            hotkeyMonitor: hotkeyMonitor,
             overlay: DictationOverlayController(),
             statusBar: StatusBarController(coordinator: coordinator, settings: settings)
         )

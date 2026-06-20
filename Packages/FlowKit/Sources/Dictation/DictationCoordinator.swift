@@ -1,3 +1,4 @@
+import AVFoundation
 import Audio
 import Foundation
 import Observation
@@ -10,6 +11,7 @@ import Transcription
 public final class DictationCoordinator {
     public private(set) var state: DictationState = .idle
     public private(set) var lastResult: DictationResult?
+    public private(set) var history: [DictationResult] = []
     public private(set) var lastError: String?
     public var onStateChange: (@MainActor (DictationState) -> Void)?
 
@@ -54,9 +56,15 @@ public final class DictationCoordinator {
         Task {
             do {
                 let audioURL = try recorder.stop()
+                let audioSeconds = Self.audioDuration(audioURL)
+                let transcribeStart = Date()
                 let transcript = try await transcriber.transcribe(audioURL: audioURL).trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcribeSeconds = Date().timeIntervalSince(transcribeStart)
                 guard !transcript.isEmpty else {
-                    throw DictationError.emptyTranscript
+                    // silence / non-speech — quietly do nothing, don't paste or flag a failure
+                    startedAt = nil
+                    setState(.idle)
+                    return
                 }
 
                 let finalText = await structure(transcript)
@@ -64,12 +72,18 @@ public final class DictationCoordinator {
                 setState(.inserting)
                 let outcome = await insert(finalText)
                 let duration = startedAt.map { Date().timeIntervalSince($0) } ?? 0
-                lastResult = DictationResult(
+                let result = DictationResult(
                     transcript: finalText,
                     duration: duration,
                     modelID: settings.modelID,
-                    insertionOutcome: outcome
+                    insertionOutcome: outcome,
+                    engineLabel: settings.engineLabel,
+                    audioSeconds: audioSeconds,
+                    transcribeSeconds: transcribeSeconds
                 )
+                lastResult = result
+                history.insert(result, at: 0)
+                if history.count > 20 { history.removeLast() }
                 setState(outcome == .pasted ? .idle : .copied)
                 if outcome != .pasted {
                     resetIdleSoon()
@@ -85,6 +99,11 @@ public final class DictationCoordinator {
         recorder.cancel()
         startedAt = nil
         setState(.idle)
+    }
+
+    private static func audioDuration(_ url: URL) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url) else { return 0 }
+        return Double(file.length) / file.fileFormat.sampleRate
     }
 
     private func structure(_ transcript: String) async -> String {

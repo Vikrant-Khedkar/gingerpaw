@@ -25,10 +25,11 @@ let package = Package(
         .target(name: "Permissions"),
         .target(name: "Audio"),
         .target(name: "Transcription", dependencies: [
+            "Settings",
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
         ]),
         .target(name: "TextInsertion"),
-        .target(name: "Hotkeys"),
+        .target(name: "Hotkeys", dependencies: ["Settings"]),
         .target(name: "Overlay", dependencies: ["Dictation"]),
         .target(
             name: "TextProcessing",

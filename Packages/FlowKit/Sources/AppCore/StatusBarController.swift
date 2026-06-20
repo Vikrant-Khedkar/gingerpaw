@@ -16,15 +16,14 @@ public final class StatusBarController {
     }
 
     public func update(state: DictationState) {
-        item.button?.title = state.isBusy ? "Flow ●" : "Flow"
-        item.button?.image = NSImage(systemSymbolName: state.isBusy ? "mic.fill" : "mic", accessibilityDescription: "GingerPaw")
+        item.button?.image = Self.pawImage(tint: Self.tint(for: state))
         statusMenuItem.title = statusTitle(for: state)
     }
 
     private func configure() {
-        item.button?.title = "Flow"
-        item.button?.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "GingerPaw")
-        item.button?.imagePosition = .imageLeading
+        item.button?.title = ""
+        item.button?.image = Self.pawImage(tint: nil)
+        item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "GingerPaw"
 
         let menu = NSMenu()
@@ -80,5 +79,46 @@ public final class StatusBarController {
         case let .failed(message):
             "GingerPaw Failed: \(message)"
         }
+    }
+
+    private static func tint(for state: DictationState) -> NSColor? {
+        switch state {
+        case .recording, .failed:
+            NSColor(srgbRed: 0xFF / 255, green: 0x3B / 255, blue: 0x30 / 255, alpha: 1)
+        case .processing, .inserting:
+            NSColor(srgbRed: 0xFF / 255, green: 0x95 / 255, blue: 0, alpha: 1)
+        case .copied:
+            NSColor(srgbRed: 0x34 / 255, green: 0xC7 / 255, blue: 0x59 / 255, alpha: 1)
+        case .idle:
+            nil // template — adapts to light/dark menu bar
+        }
+    }
+
+    /// The ginger paw, drawn for the menu bar. Template (adaptive) when tint is nil, else solid-colored.
+    private static func pawImage(tint: NSColor?) -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            (tint ?? .black).setFill()
+            let s = 18.0 / 24.0
+            let t = NSAffineTransform()
+            t.scale(by: s)
+            t.concat()
+
+            let pad = NSBezierPath()
+            pad.move(to: NSPoint(x: 12, y: 12.5))
+            pad.curve(to: NSPoint(x: 18.6, y: 17.7), controlPoint1: NSPoint(x: 16.2, y: 12.5), controlPoint2: NSPoint(x: 18.6, y: 15.1))
+            pad.curve(to: NSPoint(x: 14.7, y: 20.1), controlPoint1: NSPoint(x: 18.6, y: 19.8), controlPoint2: NSPoint(x: 16.5, y: 20.8))
+            pad.curve(to: NSPoint(x: 9.3, y: 20.1), controlPoint1: NSPoint(x: 13.0, y: 19.4), controlPoint2: NSPoint(x: 11.0, y: 19.4))
+            pad.curve(to: NSPoint(x: 5.4, y: 17.7), controlPoint1: NSPoint(x: 7.5, y: 20.8), controlPoint2: NSPoint(x: 5.4, y: 19.8))
+            pad.curve(to: NSPoint(x: 12, y: 12.5), controlPoint1: NSPoint(x: 5.4, y: 15.1), controlPoint2: NSPoint(x: 7.8, y: 12.5))
+            pad.close()
+            pad.fill()
+
+            for (cx, cy, rx, ry) in [(6.4, 11.0, 1.9, 2.5), (10.3, 8.2, 2.0, 2.7), (14.0, 8.2, 2.0, 2.7), (17.7, 11.0, 1.9, 2.5)] {
+                NSBezierPath(ovalIn: NSRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)).fill()
+            }
+            return true
+        }
+        image.isTemplate = (tint == nil)
+        return image
     }
 }

@@ -1,12 +1,15 @@
 import AppKit
 import Foundation
 import Observation
+import Settings
 
 @MainActor
 @Observable
 public final class RightOptionHotkeyMonitor {
     public var onPress: (() -> Void)?
     public var onRelease: (() -> Void)?
+    /// Resolves the currently-selected hotkey live, so changing it in Settings takes effect immediately.
+    public var hotkeyProvider: (@MainActor () -> Hotkey)?
     public private(set) var statusText = "Starting hotkey monitor"
     public private(set) var lastEventText = "No hotkey event seen"
 
@@ -97,14 +100,12 @@ public final class RightOptionHotkeyMonitor {
             return
         }
 
+        let hotkey = hotkeyProvider?() ?? .rightOption
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        let flags = event.flags
-        let isOptionEvent = keyCode == 58 || keyCode == 61
-        let isFnEvent = keyCode == 63 || flags.contains(.maskSecondaryFn)
-        guard isOptionEvent || isFnEvent else { return }
+        guard keyCode == hotkey.keyCode else { return }
 
-        let pressed = isOptionEvent ? flags.contains(.maskAlternate) : flags.contains(.maskSecondaryFn)
-        lastEventText = "\(isOptionEvent ? "Option" : "Fn") \(pressed ? "down" : "up")"
+        let pressed = event.flags.contains(hotkey.flag)
+        lastEventText = "\(hotkey.display) \(pressed ? "down" : "up")"
         if pressed, !isPressed {
             isPressed = true
             onPress?()

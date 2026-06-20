@@ -137,7 +137,7 @@ public final class DictationOverlayController {
         case .recording: "Recording"
         case .processing: "Transcribing"
         case .inserting: "Pasting"
-        case .copied: "Copied"
+        case .copied: "Copied to clipboard"
         case .failed: "Failed"
         case .idle: "Ready"
         }

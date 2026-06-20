@@ -39,7 +39,19 @@ public struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("AI Formatting")
                     Toggle("Structure dictation with on-device AI", isOn: $settings.formatEnabled)
-                    Text("Runs Qwen 0.5B locally to turn rambly speech into clean bullets and sentences. First use downloads ~280 MB.")
+                }
+            }
+
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionTitle("Hotkey")
+                    Picker("Push-to-talk key", selection: $settings.hotkey) {
+                        ForEach(Hotkey.allCases) { key in
+                            Text(key.display).tag(key)
+                        }
+                    }
+                    .labelsHidden()
+                    Text("Hold this key to dictate. Right Option or Fn recommended — they don't clash with typing.")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
             }
@@ -48,8 +60,6 @@ public struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("Appearance")
                     Toggle("Show floating recording pill", isOn: $settings.showPill)
-                    LabeledContent("Hotkey", value: settings.hotkeyDisplay)
-                        .font(.system(size: 13))
                 }
             }
 
