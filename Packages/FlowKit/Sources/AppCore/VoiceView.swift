@@ -6,12 +6,18 @@ struct VoiceView: View {
     @State private var store = VoiceSettingsStore()
     @State private var hookInstalled = HookInstaller.isInstalled(in: HookInstaller.sgaiDir)
     @State private var error: String?
+    @State private var speaker = VoiceSpeaker()
 
     private let voices: [String] = AVSpeechSynthesisVoice.speechVoices()
         .filter { $0.language.hasPrefix("en") }
         .map(\.name)
         .reduce(into: [String]()) { acc, name in if !acc.contains(name) { acc.append(name) } }
         .sorted()
+
+    private let kokoroVoices = ["af_bella", "af_sarah", "af_nicole", "af_sky",
+                                "am_adam", "am_michael",
+                                "bf_emma", "bf_isabella", "bm_george", "bm_lewis"]
+    private let kokoroAvailable = KokoroSynthesizer.isAvailable
 
     var body: some View {
         @Bindable var store = store
@@ -34,24 +40,47 @@ struct VoiceView: View {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("Voice")
-                    Picker("Voice", selection: $store.voice) {
-                        Text("System default").tag("")
-                        ForEach(voices, id: \.self) { Text($0).tag($0) }
+                    Picker("Engine", selection: $store.ttsEngine) {
+                        Text("System").tag("say")
+                        Text(kokoroAvailable ? "Kokoro — neural" : "Kokoro (not installed)").tag("kokoro")
                     }
                     .labelsHidden()
-                    HStack(spacing: 10) {
-                        Text("Speed").font(.system(size: 13)).foregroundStyle(.secondary)
-                        Slider(
-                            value: Binding(
-                                get: { Double(store.rate == 0 ? 175 : store.rate) },
-                                set: { store.rate = Int($0) }
-                            ),
-                            in: 130 ... 260
-                        )
-                        Text("\(store.rate == 0 ? 175 : store.rate)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                    .pickerStyle(.segmented)
+
+                    if store.ttsEngine == "kokoro" {
+                        Picker("Kokoro voice", selection: $store.kokoroVoice) {
+                            ForEach(kokoroVoices, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        HStack(spacing: 10) {
+                            Text("Speed").font(.system(size: 13)).foregroundStyle(.secondary)
+                            Slider(value: $store.kokoroSpeed, in: 0.7 ... 1.5)
+                            Text(String(format: "%.2fx", store.kokoroSpeed)).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                        }
+                        if !kokoroAvailable {
+                            Text("Kokoro isn't installed yet — GingerPaw falls back to the system voice until it is.")
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Picker("Voice", selection: $store.voice) {
+                            Text("System default").tag("")
+                            ForEach(voices, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        HStack(spacing: 10) {
+                            Text("Speed").font(.system(size: 13)).foregroundStyle(.secondary)
+                            Slider(
+                                value: Binding(
+                                    get: { Double(store.rate == 0 ? 175 : store.rate) },
+                                    set: { store.rate = Int($0) }
+                                ),
+                                in: 130 ... 260
+                            )
+                            Text("\(store.rate == 0 ? 175 : store.rate)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                        }
                     }
                     Button {
-                        SaySpeechService().speak("Claude finished in GingerPaw.", voice: store.voice, rate: store.rate)
+                        speaker.speak(text: "Claude finished in GingerPaw.", voiceName: store.voice, rate: store.rate)
                     } label: {
                         Label("Test voice", systemImage: "play.circle")
                     }

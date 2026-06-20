@@ -11,6 +11,9 @@ final class VoiceSettingsStore {
     var speakOnNotification: Bool { didSet { save() } }
     var voice: String { didSet { save() } }
     var rate: Int { didSet { save() } }
+    var ttsEngine: String { didSet { save() } }
+    var kokoroVoice: String { didSet { save() } }
+    var kokoroSpeed: Double { didSet { save() } }
 
     init() {
         let s = VoiceSettings.load()
@@ -19,11 +22,15 @@ final class VoiceSettingsStore {
         speakOnNotification = s.speakOnNotification
         voice = s.voice
         rate = s.rate
+        ttsEngine = s.ttsEngine
+        kokoroVoice = s.kokoroVoice
+        kokoroSpeed = s.kokoroSpeed
     }
 
     private func save() {
         VoiceSettings(enabled: enabled, speakOnStop: speakOnStop,
-                      speakOnNotification: speakOnNotification, voice: voice, rate: rate).save()
+                      speakOnNotification: speakOnNotification, voice: voice, rate: rate,
+                      ttsEngine: ttsEngine, kokoroVoice: kokoroVoice, kokoroSpeed: kokoroSpeed).save()
     }
 }
 
