@@ -29,7 +29,11 @@ final class VoiceSettingsStore {
 
 /// Installs/removes GingerPaw's Stop + Notification hooks in a Claude config's settings.json.
 enum HookInstaller {
-    static var flowossPath: String { NSHomeDirectory() + "/.local/bin/flowoss" }
+    /// Prefer the CLI bundled inside the app; fall back to a dev install in ~/.local/bin.
+    static var flowossPath: String {
+        Bundle.main.url(forAuxiliaryExecutable: "flowoss")?.path
+            ?? (NSHomeDirectory() + "/.local/bin/flowoss")
+    }
     static var sgaiDir: String { NSHomeDirectory() + "/.claude-sgai" }
 
     private static func settingsPath(_ dir: String) -> String { dir + "/settings.json" }
