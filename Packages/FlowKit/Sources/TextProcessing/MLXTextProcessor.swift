@@ -120,6 +120,17 @@ public actor MLXTextProcessor: TextProcessor {
         for prefix in ["Output:", "Output", "Reformatted:"] where result.hasPrefix(prefix) {
             result = String(result.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+
+        // The 0.5B model often runs past its answer and hallucinates the NEXT few-shot
+        // block ("Input:", "Output:", "Example", "Now reformat this:"). Cut at the first
+        // leaked marker so none of that scaffolding survives.
+        let stops = ["\nInput:", "\nOutput:", "\nExample", "\nNow reformat", "Now reformat this:", "\nInput :"]
+        var cut = result.endIndex
+        for marker in stops {
+            if let r = result.range(of: marker), r.lowerBound < cut { cut = r.lowerBound }
+        }
+        result = String(result[..<cut]).trimmingCharacters(in: .whitespacesAndNewlines)
+
         return result.isEmpty ? fallback : result
     }
 }
