@@ -12,8 +12,7 @@ public final class VoiceSpeaker {
 
     public func speak(text: String, voiceName: String, rate: Int) {
         process?.terminate()
-        cat.begin(text: text)
-        cat.reveal(upTo: text.count) // full caption — say can't drive word-by-word
+        cat.begin(text: text) // caption scrolls marquee-style in the pill
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/say")
