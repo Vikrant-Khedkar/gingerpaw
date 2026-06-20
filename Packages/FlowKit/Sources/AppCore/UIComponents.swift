@@ -1,6 +1,7 @@
 import AVFoundation
 import AppKit
 import Dictation
+import Playground
 import SwiftUI
 
 enum Brand {
@@ -14,6 +15,7 @@ enum Brand {
 
 enum FlowSection: String, CaseIterable, Identifiable {
     case dictate = "Dictate"
+    case playground = "Playground"
     case permissions = "Permissions"
     case settings = "Settings"
 
@@ -22,8 +24,31 @@ enum FlowSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .dictate: "waveform"
+        case .playground: "terminal"
         case .permissions: "lock.shield"
         case .settings: "gearshape"
+        }
+    }
+}
+
+extension AgentRunStatus {
+    var label: String {
+        switch self {
+        case .idle: "Ready"
+        case .checking: "Checking"
+        case .running: "Running"
+        case .succeeded: "Done"
+        case .failed: "Failed"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .idle: .secondary
+        case .checking: .orange
+        case .running: Brand.accent
+        case .succeeded: .green
+        case .failed: .red
         }
     }
 }

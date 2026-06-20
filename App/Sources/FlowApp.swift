@@ -11,6 +11,7 @@ struct FlowApp: App {
             AppShellView(
                 coordinator: runtime.services.coordinator,
                 hotkeyMonitor: runtime.services.hotkeyMonitor,
+                playground: runtime.services.playground,
                 settings: runtime.services.settings,
                 permissions: runtime.services.permissions
             )

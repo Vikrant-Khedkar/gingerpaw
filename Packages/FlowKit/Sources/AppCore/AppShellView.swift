@@ -1,20 +1,29 @@
 import Dictation
 import Hotkeys
 import Permissions
+import Playground
 import Settings
 import SwiftUI
 
 public struct AppShellView: View {
     @Bindable private var coordinator: DictationCoordinator
     @Bindable private var hotkeyMonitor: RightOptionHotkeyMonitor
+    @Bindable private var playground: PlaygroundController
     @Bindable private var settings: FlowSettings
     private let permissions: PermissionCenter
 
     @State private var selection: FlowSection = .dictate
 
-    public init(coordinator: DictationCoordinator, hotkeyMonitor: RightOptionHotkeyMonitor, settings: FlowSettings, permissions: PermissionCenter) {
+    public init(
+        coordinator: DictationCoordinator,
+        hotkeyMonitor: RightOptionHotkeyMonitor,
+        playground: PlaygroundController,
+        settings: FlowSettings,
+        permissions: PermissionCenter
+    ) {
         self.coordinator = coordinator
         self.hotkeyMonitor = hotkeyMonitor
+        self.playground = playground
         self.settings = settings
         self.permissions = permissions
     }
@@ -52,6 +61,8 @@ public struct AppShellView: View {
                 switch selection {
                 case .dictate:
                     DictateView(coordinator: coordinator, settings: settings, hotkeyReady: permissions.inputMonitoringLikelyTrusted)
+                case .playground:
+                    PlaygroundView(playground: playground, coordinator: coordinator)
                 case .permissions:
                     PermissionsView(hotkeyMonitor: hotkeyMonitor, permissions: permissions)
                 case .settings:

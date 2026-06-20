@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "Dictation", targets: ["Dictation"]),
         .library(name: "Hotkeys", targets: ["Hotkeys"]),
         .library(name: "Overlay", targets: ["Overlay"]),
+        .library(name: "Playground", targets: ["Playground"]),
         .library(name: "Permissions", targets: ["Permissions"]),
         .library(name: "Settings", targets: ["Settings"]),
         .library(name: "TextInsertion", targets: ["TextInsertion"]),
@@ -29,6 +30,7 @@ let package = Package(
         ]),
         .target(name: "TextInsertion"),
         .target(name: "Hotkeys"),
+        .target(name: "Playground"),
         .target(name: "Overlay", dependencies: ["Dictation"]),
         .target(
             name: "TextProcessing",
@@ -44,9 +46,10 @@ let package = Package(
         ),
         .target(
             name: "AppCore",
-            dependencies: ["Dictation", "Hotkeys", "Overlay", "Permissions", "Settings", "TextProcessing"]
+            dependencies: ["Dictation", "Hotkeys", "Overlay", "Permissions", "Playground", "Settings", "TextProcessing"]
         ),
         .testTarget(name: "DictationTests", dependencies: ["Dictation"]),
+        .testTarget(name: "PlaygroundTests", dependencies: ["Playground"]),
         .testTarget(name: "TextInsertionTests", dependencies: ["TextInsertion"]),
     ]
 )

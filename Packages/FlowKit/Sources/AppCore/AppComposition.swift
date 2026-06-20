@@ -3,6 +3,7 @@ import Dictation
 import Hotkeys
 import Overlay
 import Permissions
+import Playground
 import Settings
 import TextInsertion
 import TextProcessing
@@ -12,6 +13,7 @@ import Transcription
 public struct AppServices {
     public let settings: FlowSettings
     public let permissions: PermissionCenter
+    public let playground: PlaygroundController
     public let coordinator: DictationCoordinator
     public let hotkeyMonitor: RightOptionHotkeyMonitor
     public let overlay: DictationOverlayController
@@ -34,6 +36,7 @@ public enum AppComposition {
         return AppServices(
             settings: settings,
             permissions: PermissionCenter(),
+            playground: PlaygroundController(),
             coordinator: coordinator,
             hotkeyMonitor: RightOptionHotkeyMonitor(),
             overlay: DictationOverlayController(),
