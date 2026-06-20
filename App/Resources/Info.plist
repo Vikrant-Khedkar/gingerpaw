@@ -25,7 +25,7 @@
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSHumanReadableCopyright</key>
-	<string>© 2026 FlowOSS contributors</string>
+	<string>© 2026 GingerPaw contributors</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>GingerPaw records your voice so it can transcribe dictation locally.</string>
 </dict>

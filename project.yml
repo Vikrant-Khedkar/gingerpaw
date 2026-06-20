@@ -1,7 +1,7 @@
-name: FlowOSS
+name: GingerPaw
 
 options:
-  bundleIdPrefix: app.flowoss
+  bundleIdPrefix: app.gingerpaw
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
@@ -26,7 +26,7 @@ packages:
     path: Packages/FlowKit
 
 targets:
-  FlowOSS:
+  GingerPaw:
     type: application
     platform: macOS
     sources:
@@ -41,16 +41,16 @@ targets:
         LSMinimumSystemVersion: "14.0"
         LSUIElement: false
         NSMicrophoneUsageDescription: "GingerPaw records your voice so it can transcribe dictation locally."
-        NSHumanReadableCopyright: "© 2026 FlowOSS contributors"
+        NSHumanReadableCopyright: "© 2026 GingerPaw contributors"
     dependencies:
       - package: FlowKit
         product: AppCore
 
 schemes:
-  FlowOSS:
+  GingerPaw:
     build:
       targets:
-        FlowOSS: all
+        GingerPaw: all
     run:
       config: Debug
     test:

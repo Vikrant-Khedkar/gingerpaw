@@ -18,7 +18,7 @@ public final class AppRuntime {
         // The flowoss CLI posts this when Claude speaks — the app does the TTS so the
         // cat + caption stay in exact sync with the audio.
         DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("app.flowoss.speak"), object: nil, queue: .main
+            forName: Notification.Name("app.gingerpaw.speak"), object: nil, queue: .main
         ) { [voiceSpeaker] note in
             let text = note.userInfo?["text"] as? String ?? "Claude finished."
             let voice = note.userInfo?["voice"] as? String ?? ""

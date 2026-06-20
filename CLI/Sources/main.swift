@@ -72,10 +72,10 @@ guard let spoken = message else { exit(0) }
 
 // If the app is running, it speaks (so cat + caption stay in sync) — just signal it.
 // If not, fall back to speaking here so notifications still work headless.
-let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "app.flowoss.FlowOSS").isEmpty
+let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "app.gingerpaw.GingerPaw").isEmpty
 
 DistributedNotificationCenter.default().postNotificationName(
-    Notification.Name("app.flowoss.speak"),
+    Notification.Name("app.gingerpaw.speak"),
     object: nil,
     userInfo: ["text": spoken, "event": event.rawValue, "voice": settings.voice, "rate": String(settings.rate)],
     deliverImmediately: true
