@@ -14,6 +14,7 @@ enum Brand {
 
 enum FlowSection: String, CaseIterable, Identifiable {
     case dictate = "Dictate"
+    case voice = "Voice"
     case permissions = "Permissions"
     case settings = "Settings"
 
@@ -22,6 +23,7 @@ enum FlowSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .dictate: "waveform"
+        case .voice: "speaker.wave.2"
         case .permissions: "lock.shield"
         case .settings: "gearshape"
         }

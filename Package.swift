@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "FlowOSS", targets: ["FlowOSSApp"]),
+        .executable(name: "flowoss", targets: ["flowoss"]),
     ],
     dependencies: [
         .package(path: "Packages/FlowKit"),
@@ -17,6 +18,13 @@ let package = Package(
                 .product(name: "AppCore", package: "FlowKit"),
             ],
             path: "App/Sources"
+        ),
+        .executableTarget(
+            name: "flowoss",
+            dependencies: [
+                .product(name: "AgentNotifications", package: "FlowKit"),
+            ],
+            path: "CLI/Sources"
         ),
     ]
 )

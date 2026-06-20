@@ -5,6 +5,7 @@ let package = Package(
     name: "FlowKit",
     platforms: [.macOS(.v14)],
     products: [
+        .library(name: "AgentNotifications", targets: ["AgentNotifications"]),
         .library(name: "AppCore", targets: ["AppCore"]),
         .library(name: "Audio", targets: ["Audio"]),
         .library(name: "Dictation", targets: ["Dictation"]),
@@ -21,6 +22,7 @@ let package = Package(
         .package(url: "https://github.com/ml-explore/mlx-swift-examples", exact: "2.25.9"),
     ],
     targets: [
+        .target(name: "AgentNotifications"),
         .target(name: "Settings"),
         .target(name: "Permissions"),
         .target(name: "Audio"),
@@ -45,7 +47,7 @@ let package = Package(
         ),
         .target(
             name: "AppCore",
-            dependencies: ["Dictation", "Hotkeys", "Overlay", "Permissions", "Settings", "TextProcessing"]
+            dependencies: ["AgentNotifications", "Dictation", "Hotkeys", "Overlay", "Permissions", "Settings", "TextProcessing"]
         ),
         .testTarget(name: "DictationTests", dependencies: ["Dictation"]),
         .testTarget(name: "TextInsertionTests", dependencies: ["TextInsertion"]),

@@ -52,6 +52,8 @@ public struct AppShellView: View {
                 switch selection {
                 case .dictate:
                     DictateView(coordinator: coordinator, settings: settings, hotkeyReady: permissions.inputMonitoringLikelyTrusted)
+                case .voice:
+                    VoiceView()
                 case .permissions:
                     PermissionsView(hotkeyMonitor: hotkeyMonitor, permissions: permissions)
                 case .settings:
