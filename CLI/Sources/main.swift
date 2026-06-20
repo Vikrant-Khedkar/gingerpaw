@@ -1,4 +1,5 @@
 import AgentNotifications
+import AppKit
 import Foundation
 
 // Usage: flowoss notify --event <stop|notification|subagentStop>
@@ -68,5 +69,19 @@ if message == nil {
 }
 
 guard let spoken = message else { exit(0) }
-SaySpeechService().speak(spoken, voice: settings.voice, rate: settings.rate)
+
+// If the app is running, it speaks (so cat + caption stay in sync) — just signal it.
+// If not, fall back to speaking here so notifications still work headless.
+let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "app.flowoss.FlowOSS").isEmpty
+
+DistributedNotificationCenter.default().postNotificationName(
+    Notification.Name("app.flowoss.speak"),
+    object: nil,
+    userInfo: ["text": spoken, "event": event.rawValue, "voice": settings.voice, "rate": String(settings.rate)],
+    deliverImmediately: true
+)
+
+if !appRunning {
+    SaySpeechService().speak(spoken, voice: settings.voice, rate: settings.rate)
+}
 exit(0)
