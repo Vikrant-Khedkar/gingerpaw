@@ -36,7 +36,7 @@ struct WorkspaceRootView: View {
         .onAppear { model.refreshInstalled() }
         .onReceive(diffTimer) { _ in model.selectedWorkspace?.refreshDiff() }
         .sheet(isPresented: $showingNew) { newSheet }
-        .alert("Couldn't create workspace",
+        .alert("Something went wrong",
                isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
@@ -252,17 +252,46 @@ struct WorkspaceRootView: View {
     }
 
     private func statusBar(_ ws: Workspace) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Text(ws.branch).font(WS.mono(11)).foregroundStyle(WS.textSecondary)
             diffBadge(ws.diff)
+            ForEach(ws.ports, id: \.self) { port in
+                HStack(spacing: 5) {
+                    Circle().fill(WS.add).frame(width: 6, height: 6)
+                    Text(":\(port)").font(WS.mono(11)).foregroundStyle(WS.textSecondary)
+                }
+            }
             Spacer()
-            Text(ws.worktreePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                .font(WS.mono(11)).foregroundStyle(WS.textDim).lineLimit(1).truncationMode(.middle)
+            if ws.ahead > 0 || ws.behind > 0 {
+                Text("↑\(ws.ahead) ↓\(ws.behind)").font(WS.mono(11)).foregroundStyle(WS.textTertiary)
+            }
+            Button { createPR(ws) } label: {
+                HStack(spacing: 5) {
+                    if ws.creatingPR { ProgressView().controlSize(.mini) }
+                    else { Image(systemName: "arrow.triangle.branch").font(.system(size: 10, weight: .semibold)) }
+                    Text(ws.creatingPR ? "Creating…" : "Create PR").font(WS.mono(11))
+                }
+                .foregroundStyle(WS.accent)
+                .padding(.horizontal, 9).padding(.vertical, 2)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(WS.accent.opacity(0.45)))
+            }
+            .buttonStyle(.plain).disabled(ws.creatingPR)
         }
         .padding(.horizontal, 14)
         .frame(height: 30)
         .background(WS.bar)
         .overlay(alignment: .top) { Rectangle().fill(WS.border).frame(height: 1) }
+    }
+
+    private func createPR(_ ws: Workspace) {
+        Task {
+            switch await ws.createPR() {
+            case .success(let url):
+                if let u = URL(string: url.split(separator: "\n").last.map(String.init) ?? url) { NSWorkspace.shared.open(u) }
+            case .failure(let err):
+                errorMessage = "Couldn't create PR:\n\(err)"
+            }
+        }
     }
 
     private func noSession(_ ws: Workspace) -> some View {

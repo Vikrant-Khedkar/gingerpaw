@@ -31,6 +31,10 @@ final class Workspace: Identifiable {
     var changes: [FileChange] = []
     var selectedFile: String?
     var fileDiff: String = ""
+    var ports: [Int] = []
+    var ahead = 0
+    var behind = 0
+    var creatingPR = false
 
     init(repoPath: String, branch: String, worktreePath: String) {
         self.repoPath = repoPath
@@ -60,9 +64,14 @@ final class Workspace: Identifiable {
             let stat = DiffStat(files: files.count,
                                 insertions: files.reduce(0) { $0 + $1.insertions },
                                 deletions: files.reduce(0) { $0 + $1.deletions })
+            let ports = GitWorktrees.listeningPorts(path)
+            let ab = GitWorktrees.aheadBehind(path)
             await MainActor.run {
                 self.diff = stat
                 self.changes = files
+                self.ports = ports
+                self.ahead = ab?.ahead ?? 0
+                self.behind = ab?.behind ?? 0
                 if let sel = self.selectedFile, !files.contains(where: { $0.path == sel }) {
                     self.selectedFile = nil
                     self.fileDiff = ""
@@ -78,6 +87,14 @@ final class Workspace: Identifiable {
             let diff = GitWorktrees.fileDiff(path, file: file)
             await MainActor.run { if self.selectedFile == file.path { self.fileDiff = diff } }
         }
+    }
+
+    func createPR() async -> Result<String, Error> {
+        creatingPR = true
+        defer { creatingPR = false }
+        let path = worktreePath, b = branch
+        do { return .success(try await Task.detached { try GitWorktrees.createPR(path, branch: b) }.value) }
+        catch { return .failure(error) }
     }
 
     func commit(message: String) async throws {

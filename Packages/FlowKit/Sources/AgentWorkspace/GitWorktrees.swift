@@ -116,6 +116,71 @@ enum GitWorktrees {
         return map.values.sorted { $0.path < $1.path }
     }
 
+    /// Listening TCP ports owned by processes whose cwd is inside the worktree
+    /// (i.e. dev servers an agent started in this workspace).
+    static func listeningPorts(_ worktreePath: String) -> [Int] {
+        let listing = runShell("/usr/bin/lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"])
+        var pidPorts: [Int: Set<Int>] = [:]
+        var pid = 0
+        for line in listing.split(separator: "\n") {
+            if line.hasPrefix("p") { pid = Int(line.dropFirst()) ?? 0 }
+            else if line.hasPrefix("n"), pid != 0,
+                    let portStr = line.split(separator: ":").last {
+                let digits = portStr.prefix { $0.isNumber }
+                if let port = Int(digits) { pidPorts[pid, default: []].insert(port) }
+            }
+        }
+        guard !pidPorts.isEmpty else { return [] }
+        let cwds = runShell("/usr/bin/lsof", ["-a", "-dcwd", "-Fn", "-p", pidPorts.keys.map(String.init).joined(separator: ",")])
+        var matched = Set<Int>()
+        var cur = 0
+        for line in cwds.split(separator: "\n") {
+            if line.hasPrefix("p") { cur = Int(line.dropFirst()) ?? 0 }
+            else if line.hasPrefix("n"), cur != 0, String(line.dropFirst()).hasPrefix(worktreePath),
+                    let ports = pidPorts[cur] { matched.formUnion(ports) }
+        }
+        return matched.sorted()
+    }
+
+    /// Commits ahead / behind the branch's upstream, or nil if no upstream.
+    static func aheadBehind(_ worktreePath: String) -> (ahead: Int, behind: Int)? {
+        let out = runRaw(["-C", worktreePath, "rev-list", "--left-right", "--count", "@{u}...HEAD"])
+        let nums = out.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" }).compactMap { Int($0) }
+        guard nums.count == 2 else { return nil }
+        return (ahead: nums[1], behind: nums[0])
+    }
+
+    /// Pushes the branch and opens a PR via `gh`. Returns the PR URL.
+    static func createPR(_ worktreePath: String, branch: String) throws -> String {
+        _ = try? run(["-C", worktreePath, "push", "-u", "origin", branch])
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = ["-lc", "gh pr create --fill --head \(branch)"]
+        process.currentDirectoryURL = URL(fileURLWithPath: worktreePath)
+        let out = Pipe(), err = Pipe()
+        process.standardOutput = out; process.standardError = err
+        try process.run(); process.waitUntilExit()
+        let stdout = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0 else {
+            let e = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            throw GitError.failed(e.isEmpty ? "gh pr create failed" : e)
+        }
+        return stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func runShell(_ launchPath: String, _ args: [String]) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = args
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = Pipe()
+        guard (try? process.run()) != nil else { return "" }
+        process.waitUntilExit()
+        return String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    }
+
     private static func untrackedLineCount(_ worktreePath: String, _ path: String) -> Int {
         let full = (worktreePath as NSString).appendingPathComponent(path)
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: full),
