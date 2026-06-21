@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "AgentNotifications", targets: ["AgentNotifications"]),
+        .library(name: "AgentWorkspace", targets: ["AgentWorkspace"]),
         .library(name: "AppCore", targets: ["AppCore"]),
         .library(name: "Audio", targets: ["Audio"]),
         .library(name: "Dictation", targets: ["Dictation"]),
@@ -20,9 +21,13 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", from: "1.0.0"),
         .package(url: "https://github.com/ml-explore/mlx-swift-examples", exact: "2.25.9"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
     ],
     targets: [
         .target(name: "AgentNotifications"),
+        .target(name: "AgentWorkspace", dependencies: [
+            .product(name: "SwiftTerm", package: "SwiftTerm"),
+        ]),
         .target(name: "Settings"),
         .target(name: "Permissions"),
         .target(name: "Audio"),
@@ -47,7 +52,7 @@ let package = Package(
         ),
         .target(
             name: "AppCore",
-            dependencies: ["AgentNotifications", "Dictation", "Hotkeys", "Overlay", "Permissions", "Settings", "TextProcessing"]
+            dependencies: ["AgentNotifications", "AgentWorkspace", "Dictation", "Hotkeys", "Overlay", "Permissions", "Settings", "TextProcessing"]
         ),
         .testTarget(name: "DictationTests", dependencies: ["Dictation"]),
         .testTarget(name: "TextInsertionTests", dependencies: ["TextInsertion"]),

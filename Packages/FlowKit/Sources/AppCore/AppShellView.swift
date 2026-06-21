@@ -1,3 +1,4 @@
+import AgentWorkspace
 import Dictation
 import Hotkeys
 import Permissions
@@ -54,6 +55,8 @@ public struct AppShellView: View {
                     DictateView(coordinator: coordinator, settings: settings, hotkeyReady: permissions.inputMonitoringLikelyTrusted)
                 case .voice:
                     VoiceView()
+                case .workspaces:
+                    AgentWorkspaceView()
                 case .permissions:
                     PermissionsView(hotkeyMonitor: hotkeyMonitor, permissions: permissions)
                 case .settings:
@@ -61,7 +64,7 @@ public struct AppShellView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(28)
+            .padding(selection == .workspaces ? 0 : 28)
         }
         .frame(minWidth: 660, minHeight: 460)
         .tint(Brand.accent)

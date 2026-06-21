@@ -15,6 +15,7 @@ enum Brand {
 enum FlowSection: String, CaseIterable, Identifiable {
     case dictate = "Dictate"
     case voice = "Voice"
+    case workspaces = "Workspaces"
     case permissions = "Permissions"
     case settings = "Settings"
 
@@ -24,6 +25,7 @@ enum FlowSection: String, CaseIterable, Identifiable {
         switch self {
         case .dictate: "waveform"
         case .voice: "speaker.wave.2"
+        case .workspaces: "terminal"
         case .permissions: "lock.shield"
         case .settings: "gearshape"
         }
