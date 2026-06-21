@@ -58,9 +58,9 @@ struct WorkspaceRootView: View {
     private func railIcon(_ symbol: String, active: Bool) -> some View {
         Image(systemName: symbol)
             .font(.system(size: 16, weight: .medium))
-            .foregroundStyle(active ? WS.accent : WS.textTertiary)
+            .foregroundStyle(active ? Color(hex: 0xe9e9ec) : WS.textTertiary)
             .frame(width: 36, height: 36)
-            .background(active ? WS.accentSubtle : .clear, in: RoundedRectangle(cornerRadius: 9))
+            .background(active ? Color.white.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 9))
             .overlay(alignment: .leading) {
                 if active { Capsule().fill(WS.accent).frame(width: 3, height: 18).offset(x: -8) }
             }
@@ -107,18 +107,19 @@ struct WorkspaceRootView: View {
 
     private func workspaceRow(_ ws: Workspace) -> some View {
         let selected = model.selectedWorkspaceID == ws.id
-        return HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
                 Text(ws.repoName).font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(selected ? WS.textPrimary : Color(hex: 0xd7d8db)).lineLimit(1)
-                Text(ws.branch).font(WS.mono(11)).foregroundStyle(selected ? WS.textSecondary : WS.textTertiary).lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 5) {
+                Spacer(minLength: 6)
                 if !ws.sessions.isEmpty {
                     Circle().fill(WS.accent).frame(width: 7, height: 7)
                         .overlay(Circle().stroke(WS.accent.opacity(0.25), lineWidth: 3))
                 }
+            }
+            HStack(spacing: 6) {
+                Text(ws.branch).font(WS.mono(11)).foregroundStyle(selected ? WS.textSecondary : WS.textTertiary).lineLimit(1)
+                Spacer(minLength: 6)
                 diffBadge(ws.diff)
             }
         }
