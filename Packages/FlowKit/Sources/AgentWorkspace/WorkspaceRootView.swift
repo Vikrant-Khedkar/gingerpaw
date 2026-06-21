@@ -36,7 +36,7 @@ struct WorkspaceRootView: View {
             HStack {
                 Text("Workspaces").font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Button { newRepoPath = ""; newBranch = "agent/work"; showingNew = true } label: {
+                Button { newRepoPath = ""; newBranch = "agent/work-\(model.workspaces.count + 1)"; showingNew = true } label: {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.borderless)
@@ -69,9 +69,9 @@ struct WorkspaceRootView: View {
 
     private func workspaceRow(_ ws: Workspace) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(ws.branch).font(.system(size: 13, weight: .medium)).lineLimit(1)
+            Text(ws.repoName).font(.system(size: 13, weight: .medium)).lineLimit(1)
             HStack(spacing: 6) {
-                Text(ws.repoName).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                Text(ws.branch).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 if !ws.diff.isEmpty {
                     Text("+\(ws.diff.insertions)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.green)

@@ -20,12 +20,22 @@ enum GitWorktrees {
             .trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 
-    /// Creates (or adopts) a worktree for `branch` off `repoPath`. Returns its path.
-    static func create(repoPath: String, branch: String) throws -> String {
-        let branch = branch.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !branch.isEmpty, !branch.contains("..") else {
-            throw GitError.failed("Invalid branch name")
+    /// Best-effort scrub of a user-typed branch name into a legal-ish git ref:
+    /// keep word chars + - _ . /, turn everything else into '-', collapse repeats,
+    /// strip leading/trailing separators.
+    static func sanitizeBranch(_ raw: String) -> String {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./")
+        var s = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).map { allowed.contains($0) ? $0 : "-" })
+        for pair in ["..": ".", "--": "-", "//": "/"] {
+            while s.contains(pair.key) { s = s.replacingOccurrences(of: pair.key, with: pair.value) }
         }
+        return s.trimmingCharacters(in: CharacterSet(charactersIn: "-/."))
+    }
+
+    /// Creates (or adopts) a worktree for `branch` off `repoPath`. Returns its path.
+    static func create(repoPath: String, branch rawBranch: String) throws -> String {
+        let branch = sanitizeBranch(rawBranch)
+        guard !branch.isEmpty else { throw GitError.failed("Invalid branch name") }
         let repoName = (repoPath as NSString).lastPathComponent
         let projectRoot = (root() as NSString).appendingPathComponent(repoName)
         let dir = (projectRoot as NSString).appendingPathComponent(branch)
