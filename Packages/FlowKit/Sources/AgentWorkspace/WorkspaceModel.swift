@@ -56,8 +56,10 @@ final class Workspace: Identifiable {
     func refreshDiff() {
         let path = worktreePath
         Task.detached {
-            let stat = GitWorktrees.diffStat(path)
             let files = GitWorktrees.changedFiles(path)
+            let stat = DiffStat(files: files.count,
+                                insertions: files.reduce(0) { $0 + $1.insertions },
+                                deletions: files.reduce(0) { $0 + $1.deletions })
             await MainActor.run {
                 self.diff = stat
                 self.changes = files

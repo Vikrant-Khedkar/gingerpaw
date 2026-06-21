@@ -106,7 +106,7 @@ enum GitWorktrees {
             let code = String(s.prefix(2))
             let path = String(s.dropFirst(3))
             if code == "??" {
-                map[path] = FileChange(path: path, insertions: 0, deletions: 0, status: "?")
+                map[path] = FileChange(path: path, insertions: untrackedLineCount(worktreePath, path), deletions: 0, status: "?")
             } else {
                 let letter = code.replacingOccurrences(of: " ", with: "").first.map(String.init) ?? "M"
                 if var existing = map[path] { existing.status = letter; map[path] = existing }
@@ -114,6 +114,15 @@ enum GitWorktrees {
             }
         }
         return map.values.sorted { $0.path < $1.path }
+    }
+
+    private static func untrackedLineCount(_ worktreePath: String, _ path: String) -> Int {
+        let full = (worktreePath as NSString).appendingPathComponent(path)
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: full),
+              let size = attrs[.size] as? Int, size > 0, size < 2_000_000,
+              let content = try? String(contentsOfFile: full, encoding: .utf8), !content.isEmpty
+        else { return 0 }
+        return content.split(separator: "\n", omittingEmptySubsequences: false).count
     }
 
     static func commit(_ worktreePath: String, message: String) throws {
