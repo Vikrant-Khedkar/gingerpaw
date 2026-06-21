@@ -19,12 +19,17 @@ struct DiffPanel: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(WS.border)
-            if tab == 0 { filesList } else { changesView }
+            switch tab {
+            case 0: filesList
+            case 1: diffText(workspace.fileDiff, empty: workspace.selectedFile == nil ? "Select a file" : "No diff")
+            default: diffText(workspace.fullDiff, empty: "No changes to review")
+            }
             footer
         }
         .frame(maxHeight: .infinity)
         .background(WS.panel)
         .overlay(alignment: .leading) { Rectangle().fill(WS.border).frame(width: 1) }
+        .onChange(of: tab) { if tab == 2 { workspace.loadFullDiff() } }
         .sheet(isPresented: $showCommit) { commitSheet }
     }
 
@@ -32,7 +37,7 @@ struct DiffPanel: View {
         HStack(spacing: 18) {
             tabLabel("Files", 0)
             tabLabel("Changes", 1)
-            Text("Review").font(.system(size: 13)).foregroundStyle(WS.textDim)
+            tabLabel("Review", 2)
             Spacer()
             Button { workspace.refreshDiff() } label: {
                 Image(systemName: "arrow.clockwise").font(.system(size: 12)).foregroundStyle(WS.textSecondary)
@@ -92,13 +97,13 @@ struct DiffPanel: View {
         .onTapGesture { workspace.selectFile(file); tab = 1 }
     }
 
-    @ViewBuilder private var changesView: some View {
-        if workspace.fileDiff.isEmpty {
-            placeholder("doc.text", workspace.selectedFile == nil ? "Select a file" : "No diff")
+    @ViewBuilder private func diffText(_ text: String, empty: String) -> some View {
+        if text.isEmpty {
+            placeholder("doc.text", empty)
         } else {
             ScrollView([.vertical, .horizontal]) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(workspace.fileDiff.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, raw in
+                    ForEach(Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, raw in
                         let line = String(raw)
                         Text(line.isEmpty ? " " : line)
                             .font(WS.mono(11.5)).foregroundStyle(lineColor(line))

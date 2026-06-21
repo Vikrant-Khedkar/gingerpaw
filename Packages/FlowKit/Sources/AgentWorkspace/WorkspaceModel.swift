@@ -31,6 +31,7 @@ final class Workspace: Identifiable {
     var changes: [FileChange] = []
     var selectedFile: String?
     var fileDiff: String = ""
+    var fullDiff: String = ""
     var ports: [Int] = []
     var ahead = 0
     var behind = 0
@@ -77,6 +78,14 @@ final class Workspace: Identifiable {
                     self.fileDiff = ""
                 }
             }
+        }
+    }
+
+    func loadFullDiff() {
+        let path = worktreePath
+        Task.detached {
+            let diff = GitWorktrees.fullDiff(path)
+            await MainActor.run { self.fullDiff = diff }
         }
     }
 

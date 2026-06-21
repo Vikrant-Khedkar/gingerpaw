@@ -32,6 +32,7 @@ struct WorkspaceRootView: View {
         .ignoresSafeArea(.container, edges: .top)
         .frame(minWidth: 900, minHeight: 560)
         .background(WS.bg)
+        .background { keyboardShortcuts }
         .preferredColorScheme(.dark)
         .onAppear { model.refreshInstalled() }
         .onReceive(diffTimer) { _ in model.selectedWorkspace?.refreshDiff() }
@@ -75,11 +76,11 @@ struct WorkspaceRootView: View {
 
     private var iconRail: some View {
         VStack(spacing: 4) {
-            railIcon("rectangle.stack", active: true)
-            railIcon("arrow.triangle.branch", active: false)
-            railIcon("waveform.path.ecg", active: false)
+            railIcon("rectangle.stack", active: true) {}
             Spacer()
-            railIcon("gearshape", active: false)
+            railIcon("gearshape", active: false) {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
         }
         .padding(.vertical, 12)
         .frame(width: 52)
@@ -88,15 +89,18 @@ struct WorkspaceRootView: View {
         .overlay(alignment: .trailing) { Rectangle().fill(WS.border).frame(width: 1) }
     }
 
-    private func railIcon(_ symbol: String, active: Bool) -> some View {
-        Image(systemName: symbol)
-            .font(.system(size: 16, weight: .medium))
-            .foregroundStyle(active ? Color(hex: 0xe9e9ec) : WS.textTertiary)
-            .frame(width: 36, height: 36)
-            .background(active ? Color.white.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 9))
-            .overlay(alignment: .leading) {
-                if active { Capsule().fill(WS.accent).frame(width: 3, height: 18).offset(x: -8) }
-            }
+    private func railIcon(_ symbol: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(active ? Color(hex: 0xe9e9ec) : WS.textTertiary)
+                .frame(width: 36, height: 36)
+                .background(active ? Color.white.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(alignment: .leading) {
+                    if active { Capsule().fill(WS.accent).frame(width: 3, height: 18).offset(x: -8) }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Sidebar
@@ -106,12 +110,7 @@ struct WorkspaceRootView: View {
             HStack {
                 Text("WORKSPACES").font(.system(size: 10.5, weight: .bold)).tracking(1.4).foregroundStyle(WS.label)
                 Spacer()
-                Button {
-                    newRepoPath = ""
-                    newBranch = "agent/work-\(model.workspaces.count + 1)"
-                    newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude
-                    showingNew = true
-                } label: {
+                Button { openNewWorkspace() } label: {
                     Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(WS.textSecondary)
                         .frame(width: 22, height: 22)
                 }
@@ -318,7 +317,7 @@ struct WorkspaceRootView: View {
             Text("Create your first workspace").font(.system(size: 17, weight: .semibold)).foregroundStyle(Color(hex: 0xe9e9ec))
             Text("Pick a repo and a branch — gingerpaw spins up an isolated git worktree, then launches your chosen agent inside it.")
                 .font(.system(size: 13)).foregroundStyle(WS.textTertiary).multilineTextAlignment(.center).frame(maxWidth: 360)
-            Button { newRepoPath = ""; newBranch = "agent/work-1"; newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude; showingNew = true } label: {
+            Button { openNewWorkspace() } label: {
                 Label("New Workspace", systemImage: "plus").font(.system(size: 13, weight: .semibold))
             }
             .buttonStyle(PrimaryButtonStyle()).padding(.top, 14)
@@ -392,6 +391,25 @@ struct WorkspaceRootView: View {
             Text(title).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(WS.textSecondary)
             content()
         }
+    }
+
+    private func openNewWorkspace() {
+        newRepoPath = ""
+        newBranch = "agent/work-\(model.workspaces.count + 1)"
+        newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude
+        showingNew = true
+    }
+
+    private var keyboardShortcuts: some View {
+        Group {
+            Button("") { openNewWorkspace() }.keyboardShortcut("n", modifiers: .command)
+            Button("") {
+                if let ws = model.selectedWorkspace, let a = AgentKind.allCases.first(where: { model.installed.contains($0) }) {
+                    ws.openSession(a)
+                }
+            }.keyboardShortcut("t", modifiers: .command)
+        }
+        .frame(width: 0, height: 0).opacity(0)
     }
 
     private func create() {

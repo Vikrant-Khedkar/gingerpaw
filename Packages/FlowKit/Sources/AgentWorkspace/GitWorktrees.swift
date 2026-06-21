@@ -195,6 +195,10 @@ enum GitWorktrees {
         try run(["-C", worktreePath, "commit", "-m", message])
     }
 
+    static func fullDiff(_ worktreePath: String) -> String {
+        runRaw(["-C", worktreePath, "diff", "HEAD"])
+    }
+
     static func fileDiff(_ worktreePath: String, file: FileChange) -> String {
         file.isUntracked
             ? runRaw(["-C", worktreePath, "diff", "--no-index", "--", "/dev/null", file.path])
