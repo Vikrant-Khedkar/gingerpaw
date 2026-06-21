@@ -56,7 +56,7 @@ public struct AppShellView: View {
                 case .voice:
                     VoiceView()
                 case .workspaces:
-                    AgentWorkspaceView()
+                    EmptyView() // opens in its own window
                 case .permissions:
                     PermissionsView(hotkeyMonitor: hotkeyMonitor, permissions: permissions)
                 case .settings:
@@ -73,7 +73,11 @@ public struct AppShellView: View {
     private func sidebarItem(_ section: FlowSection) -> some View {
         let isSelected = selection == section
         return Button {
-            selection = section
+            if section == .workspaces {
+                AgentWorkspaceWindow.show()
+            } else {
+                selection = section
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: section.icon)
