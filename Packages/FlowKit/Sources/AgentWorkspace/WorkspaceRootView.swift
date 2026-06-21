@@ -9,6 +9,7 @@ struct WorkspaceRootView: View {
     @State private var showingNew = false
     @State private var newRepoPath = ""
     @State private var newBranch = "agent/work"
+    @State private var newAgent: AgentKind = .claude
     @State private var creating = false
     @State private var errorMessage: String?
 
@@ -36,7 +37,12 @@ struct WorkspaceRootView: View {
             HStack {
                 Text("Workspaces").font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Button { newRepoPath = ""; newBranch = "agent/work-\(model.workspaces.count + 1)"; showingNew = true } label: {
+                Button {
+                    newRepoPath = ""
+                    newBranch = "agent/work-\(model.workspaces.count + 1)"
+                    newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude
+                    showingNew = true
+                } label: {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.borderless)
@@ -130,8 +136,14 @@ struct WorkspaceRootView: View {
         Menu {
             ForEach(AgentKind.allCases) { kind in
                 let installed = model.installed.contains(kind)
-                Button(installed ? kind.title : "\(kind.title) — not installed") { ws.openSession(kind) }
-                    .disabled(!installed)
+                Button { ws.openSession(kind) } label: {
+                    Label {
+                        Text(installed ? kind.title : "\(kind.title) — not installed")
+                    } icon: {
+                        Self.agentIcon(kind)
+                    }
+                }
+                .disabled(!installed)
             }
         } label: {
             Image(systemName: "plus").font(.system(size: 12, weight: .bold))
@@ -181,12 +193,36 @@ struct WorkspaceRootView: View {
                 TextField("agent/work", text: $newBranch).textFieldStyle(.roundedBorder)
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Agent").font(.system(size: 12)).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ForEach(AgentKind.allCases) { kind in
+                        let installed = model.installed.contains(kind)
+                        Button { newAgent = kind } label: {
+                            HStack(spacing: 6) {
+                                Image(kind.logo).resizable().frame(width: 16, height: 16)
+                                Text(kind.title).font(.system(size: 12))
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(newAgent == kind ? Color.accentColor.opacity(0.22) : Color.secondary.opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: 6))
+                            .opacity(installed ? 1 : 0.4)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!installed)
+                    }
+                }
+            }
+
             HStack {
                 Spacer()
                 Button("Cancel") { showingNew = false }
                 Button(creating ? "Creating…" : "Create") { create() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(newRepoPath.isEmpty || newBranch.trimmingCharacters(in: .whitespaces).isEmpty || creating)
+                    .disabled(newRepoPath.isEmpty
+                        || newBranch.trimmingCharacters(in: .whitespaces).isEmpty
+                        || !model.installed.contains(newAgent)
+                        || creating)
             }
         }
         .padding(20).frame(width: 460)
@@ -195,9 +231,11 @@ struct WorkspaceRootView: View {
     private func create() {
         creating = true
         let repo = newRepoPath, branch = newBranch
+        let agent = newAgent
         Task {
             do {
                 try await model.createWorkspace(repoPath: repo, branch: branch)
+                model.selectedWorkspace?.openSession(agent)
                 creating = false
                 showingNew = false
             } catch {
@@ -205,6 +243,16 @@ struct WorkspaceRootView: View {
                 errorMessage = "\(error)"
             }
         }
+    }
+
+    /// Asset logos render at native (huge) size inside a SwiftUI Menu unless the
+    /// NSImage carries an explicit point size — so hand the menu a resized copy.
+    static func agentIcon(_ kind: AgentKind) -> Image {
+        guard let base = NSImage(named: kind.logo), let copy = base.copy() as? NSImage else {
+            return Image(systemName: "terminal")
+        }
+        copy.size = NSSize(width: 16, height: 16)
+        return Image(nsImage: copy)
     }
 
     private func pickRepo() -> String? {
