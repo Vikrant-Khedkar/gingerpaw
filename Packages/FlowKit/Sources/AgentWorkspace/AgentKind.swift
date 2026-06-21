@@ -29,18 +29,22 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
     /// safe because every session runs in its own isolated git worktree.
     public var launchCommand: String {
         switch self {
-        case .claude: "claude --dangerously-skip-permissions"
+        // --mcp-config force-loads the worktree's .mcp.json (Claude won't auto-trust
+        // a project MCP server otherwise). cwd is the worktree, so the path is relative.
+        case .claude: "claude --dangerously-skip-permissions --mcp-config .mcp.json"
         case .codex: "codex --dangerously-bypass-approvals-and-sandbox"
         case .gemini: "gemini --approval-mode=auto_edit"
         case .cursor: "cursor-agent"
         }
     }
 
-    /// Command form used when launching WITH an initial prompt (codex needs a
-    /// trailing `--` so the prompt is a positional arg). Mirrors Superset.
+    /// Command form used when launching WITH an initial prompt. A trailing `--`
+    /// terminates option parsing so the prompt is a clean positional — required for
+    /// codex, and for claude because its variadic `--mcp-config` would otherwise
+    /// swallow the prompt as another config path. Mirrors Superset.
     public var promptCommand: String {
         switch self {
-        case .codex: launchCommand + " --"
+        case .codex, .claude: launchCommand + " --"
         default: launchCommand
         }
     }

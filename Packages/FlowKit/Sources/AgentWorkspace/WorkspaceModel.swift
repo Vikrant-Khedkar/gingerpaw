@@ -56,6 +56,7 @@ final class Workspace: Identifiable {
     var repoName: String { (repoPath as NSString).lastPathComponent }
 
     func openSession(_ kind: AgentKind, prompt: String? = nil) {
+        MCPConfig.wireWorktree(worktreePath)   // ensure .mcp.json exists before launch
         let session = AgentSession(kind: kind, directory: worktreePath, prompt: prompt)
         sessions.append(session)
         selectedSessionID = session.id
