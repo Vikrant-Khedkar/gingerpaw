@@ -8,6 +8,17 @@ public struct DiffStat: Sendable, Equatable {
     public var isEmpty: Bool { files == 0 && insertions == 0 && deletions == 0 }
 }
 
+public struct FileChange: Sendable, Identifiable, Equatable {
+    public var path: String
+    public var insertions: Int
+    public var deletions: Int
+    public var status: String   // M, A, D, R, ? …
+    public var id: String { path }
+    public var dir: String { (path as NSString).deletingLastPathComponent }
+    public var name: String { (path as NSString).lastPathComponent }
+    public var isUntracked: Bool { status == "?" }
+}
+
 enum GitError: Error { case failed(String) }
 
 /// Git worktree management — mirrors Superset's model: each workspace is a worktree
@@ -74,6 +85,52 @@ enum GitWorktrees {
             return 0
         }
         return DiffStat(files: num("file"), insertions: num("insertion"), deletions: num("deletion"))
+    }
+
+    /// Changed files vs HEAD (tracked, with +/− counts) plus untracked files.
+    static func changedFiles(_ worktreePath: String) -> [FileChange] {
+        var map: [String: FileChange] = [:]
+        let numstat = runRaw(["-C", worktreePath, "diff", "--numstat", "HEAD"])
+        for line in numstat.split(separator: "\n") {
+            let cols = line.components(separatedBy: "\t")
+            guard cols.count == 3 else { continue }
+            map[cols[2]] = FileChange(path: cols[2], insertions: Int(cols[0]) ?? 0, deletions: Int(cols[1]) ?? 0, status: "M")
+        }
+        let status = runRaw(["-C", worktreePath, "status", "--porcelain"])
+        for line in status.split(separator: "\n") {
+            let s = String(line)
+            guard s.count >= 3 else { continue }
+            let code = String(s.prefix(2))
+            let path = String(s.dropFirst(3))
+            if code == "??" {
+                map[path] = FileChange(path: path, insertions: 0, deletions: 0, status: "?")
+            } else {
+                let letter = code.replacingOccurrences(of: " ", with: "").first.map(String.init) ?? "M"
+                if var existing = map[path] { existing.status = letter; map[path] = existing }
+                else { map[path] = FileChange(path: path, insertions: 0, deletions: 0, status: letter) }
+            }
+        }
+        return map.values.sorted { $0.path < $1.path }
+    }
+
+    static func fileDiff(_ worktreePath: String, file: FileChange) -> String {
+        file.isUntracked
+            ? runRaw(["-C", worktreePath, "diff", "--no-index", "--", "/dev/null", file.path])
+            : runRaw(["-C", worktreePath, "diff", "HEAD", "--", file.path])
+    }
+
+    /// Like `run` but returns stdout regardless of exit code — `git diff` exits 1
+    /// when there ARE differences, which isn't an error for our purposes.
+    static func runRaw(_ args: [String]) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = args
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = Pipe()
+        guard (try? process.run()) != nil else { return "" }
+        process.waitUntilExit()
+        return String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     }
 
     @discardableResult

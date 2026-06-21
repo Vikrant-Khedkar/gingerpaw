@@ -92,10 +92,16 @@ struct WorkspaceRootView: View {
 
     @ViewBuilder private var main: some View {
         if let ws = model.selectedWorkspace {
-            VStack(spacing: 0) {
-                tabBar(ws)
-                Divider()
-                terminalArea(ws)
+            HSplitView {
+                VStack(spacing: 0) {
+                    tabBar(ws)
+                    Divider()
+                    terminalArea(ws)
+                }
+                .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+
+                DiffPanel(workspace: ws)
+                    .frame(minWidth: 260, idealWidth: 320, maxWidth: 480)
             }
         } else {
             VStack(spacing: 10) {

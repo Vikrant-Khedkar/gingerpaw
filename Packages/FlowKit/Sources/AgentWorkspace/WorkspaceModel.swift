@@ -28,6 +28,9 @@ final class Workspace: Identifiable {
     var sessions: [AgentSession] = []
     var selectedSessionID: AgentSession.ID?
     var diff: DiffStat = .zero
+    var changes: [FileChange] = []
+    var selectedFile: String?
+    var fileDiff: String = ""
 
     init(repoPath: String, branch: String, worktreePath: String) {
         self.repoPath = repoPath
@@ -54,7 +57,24 @@ final class Workspace: Identifiable {
         let path = worktreePath
         Task.detached {
             let stat = GitWorktrees.diffStat(path)
-            await MainActor.run { self.diff = stat }
+            let files = GitWorktrees.changedFiles(path)
+            await MainActor.run {
+                self.diff = stat
+                self.changes = files
+                if let sel = self.selectedFile, !files.contains(where: { $0.path == sel }) {
+                    self.selectedFile = nil
+                    self.fileDiff = ""
+                }
+            }
+        }
+    }
+
+    func selectFile(_ file: FileChange) {
+        selectedFile = file.path
+        let path = worktreePath
+        Task.detached {
+            let diff = GitWorktrees.fileDiff(path, file: file)
+            await MainActor.run { if self.selectedFile == file.path { self.fileDiff = diff } }
         }
     }
 
