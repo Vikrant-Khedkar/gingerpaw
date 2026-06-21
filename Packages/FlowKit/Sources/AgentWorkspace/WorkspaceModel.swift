@@ -78,6 +78,12 @@ final class Workspace: Identifiable {
         }
     }
 
+    func commit(message: String) async throws {
+        let path = worktreePath
+        try await Task.detached { try GitWorktrees.commit(path, message: message) }.value
+        refreshDiff()
+    }
+
     func terminateAll() { sessions.forEach { $0.terminate() } }
 }
 

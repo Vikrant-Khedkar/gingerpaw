@@ -14,7 +14,7 @@ public enum AgentWorkspaceWindow {
         }
         let hosting = NSHostingController(rootView: WorkspaceRootView())
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Agent Workspace"
+        window.title = "gingerpaw"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         // Closing hides the window instead of destroying it, so reopening from
         // the sidebar restores it exactly as left (sessions + state intact).

@@ -116,6 +116,11 @@ enum GitWorktrees {
         return map.values.sorted { $0.path < $1.path }
     }
 
+    static func commit(_ worktreePath: String, message: String) throws {
+        try run(["-C", worktreePath, "add", "-A"])
+        try run(["-C", worktreePath, "commit", "-m", message])
+    }
+
     static func fileDiff(_ worktreePath: String, file: FileChange) -> String {
         file.isUntracked
             ? runRaw(["-C", worktreePath, "diff", "--no-index", "--", "/dev/null", file.path])
