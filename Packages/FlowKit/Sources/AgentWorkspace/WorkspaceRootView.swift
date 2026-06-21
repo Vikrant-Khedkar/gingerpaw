@@ -16,13 +16,16 @@ struct WorkspaceRootView: View {
     private let diffTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 0) {
-            iconRail
-            HSplitView {
-                sidebar.frame(minWidth: 210, idealWidth: 248, maxWidth: 300)
-                main.frame(minWidth: 440, maxWidth: .infinity)
-                if showDiff, let ws = model.selectedWorkspace {
-                    DiffPanel(workspace: ws).frame(minWidth: 280, idealWidth: 320, maxWidth: 480)
+        VStack(spacing: 0) {
+            titleBar
+            HStack(spacing: 0) {
+                iconRail
+                HSplitView {
+                    sidebar.frame(minWidth: 210, idealWidth: 248, maxWidth: 300)
+                    main.frame(minWidth: 440, maxWidth: .infinity)
+                    if showDiff, let ws = model.selectedWorkspace {
+                        DiffPanel(workspace: ws).frame(minWidth: 280, idealWidth: 320, maxWidth: 480)
+                    }
                 }
             }
         }
@@ -36,6 +39,35 @@ struct WorkspaceRootView: View {
                isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+    }
+
+    // MARK: Titlebar
+
+    private var titleBar: some View {
+        ZStack {
+            HStack(spacing: 8) {
+                Image(systemName: "pawprint.fill").font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color(hex: 0x1a1208))
+                    .frame(width: 20, height: 20)
+                    .background(LinearGradient(colors: [WS.accent, Color(hex: 0xd96a2a)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                in: RoundedRectangle(cornerRadius: 6))
+                Text("gingerpaw").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color(hex: 0xe9e9ec))
+            }
+            HStack {
+                Spacer()
+                Button { showDiff.toggle() } label: {
+                    Image(systemName: "sidebar.right").font(.system(size: 14))
+                        .foregroundStyle(showDiff ? WS.accent : WS.textSecondary)
+                        .frame(width: 26, height: 24)
+                        .background(showDiff ? WS.accentSubtle : .clear, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain).padding(.trailing, 14)
+            }
+        }
+        .frame(height: 40)
+        .frame(maxWidth: .infinity)
+        .background(WS.titlebar)
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.black.opacity(0.4)).frame(height: 1) }
     }
 
     // MARK: Icon rail
@@ -163,11 +195,6 @@ struct WorkspaceRootView: View {
             ForEach(ws.sessions) { sessionTab(ws, $0) }
             addMenu(ws)
             Spacer()
-            Button { showDiff.toggle() } label: {
-                Image(systemName: "sidebar.right").font(.system(size: 14))
-                    .foregroundStyle(showDiff ? WS.accent : WS.textSecondary).frame(width: 26, height: 26)
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .frame(height: 42)
