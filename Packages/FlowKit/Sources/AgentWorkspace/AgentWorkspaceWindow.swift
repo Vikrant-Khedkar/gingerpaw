@@ -16,6 +16,9 @@ public enum AgentWorkspaceWindow {
         let window = NSWindow(contentViewController: hosting)
         window.title = "Agent Workspace"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        // Closing hides the window instead of destroying it, so reopening from
+        // the sidebar restores it exactly as left (sessions + state intact).
+        window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 1000, height: 640))
         window.center()
         controller = NSWindowController(window: window)
