@@ -29,6 +29,7 @@ struct WorkspaceRootView: View {
                 }
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .frame(minWidth: 900, minHeight: 560)
         .background(WS.bg)
         .preferredColorScheme(.dark)
