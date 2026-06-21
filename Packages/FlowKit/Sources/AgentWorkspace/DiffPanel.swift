@@ -19,14 +19,16 @@ struct DiffPanel: View {
                     Text("Files").tag(0)
                     Text("Diff").tag(1)
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 130)
-                Spacer()
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                Spacer(minLength: 6)
                 Text("\(workspace.changes.count) changed")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize()
                 Button { workspace.refreshDiff() } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless)
             }
-            .padding(8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             Divider()
 
             if mode == 0 { filesList } else { diffView }
