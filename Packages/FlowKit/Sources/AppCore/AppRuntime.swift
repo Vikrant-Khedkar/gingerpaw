@@ -1,3 +1,4 @@
+import AgentWorkspace
 import Foundation
 
 @MainActor
@@ -37,5 +38,8 @@ public final class AppRuntime {
             coordinator.stopRecordingAndProcess()
         }
         services.hotkeyMonitor.start()
+
+        // Loopback IPC server so agents inside workspaces can drive the cockpit via MCP.
+        MCPBridgeServer.shared.start()
     }
 }

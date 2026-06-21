@@ -5,6 +5,7 @@ let package = Package(
     name: "FlowKit",
     platforms: [.macOS(.v14)],
     products: [
+        .library(name: "AgentMCP", targets: ["AgentMCP"]),
         .library(name: "AgentNotifications", targets: ["AgentNotifications"]),
         .library(name: "AgentWorkspace", targets: ["AgentWorkspace"]),
         .library(name: "AppCore", targets: ["AppCore"]),
@@ -24,8 +25,10 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
     ],
     targets: [
+        .target(name: "AgentMCP"),
         .target(name: "AgentNotifications"),
         .target(name: "AgentWorkspace", dependencies: [
+            "AgentMCP",
             .product(name: "SwiftTerm", package: "SwiftTerm"),
         ]),
         .target(name: "Settings"),

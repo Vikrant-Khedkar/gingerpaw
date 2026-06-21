@@ -4,7 +4,7 @@ import SwiftUI
 /// Agent Workspace — "Trail" layout: icon rail · workspaces sidebar · tabbed
 /// terminal + status bar · docked Files/Diff panel.
 struct WorkspaceRootView: View {
-    @State private var model = WorkspaceModel()
+    @State private var model = WorkspaceModel.shared
     @State private var showingNew = false
     @State private var newRepoPath = ""
     @State private var newBranch = "agent/work"

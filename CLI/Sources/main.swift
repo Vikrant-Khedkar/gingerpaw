@@ -34,8 +34,14 @@ func waitForStableFile(_ path: String, settleMs: Int, maxMs: Int) {
 
 let args = CommandLine.arguments
 
+// MCP server mode: stdio JSON-RPC bridge to the running app.
+if args.count >= 2, args[1] == "mcp" {
+    MCPServer().run()
+    exit(0)
+}
+
 guard args.count >= 2, args[1] == "notify" else {
-    FileHandle.standardError.write(Data("usage: flowoss notify --event <stop|notification|subagentStop>\n".utf8))
+    FileHandle.standardError.write(Data("usage: flowoss <notify|mcp>\n".utf8))
     exit(2)
 }
 

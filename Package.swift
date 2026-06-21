@@ -23,6 +23,7 @@ let package = Package(
             name: "flowoss",
             dependencies: [
                 .product(name: "AgentNotifications", package: "FlowKit"),
+                .product(name: "AgentMCP", package: "FlowKit"),
             ],
             path: "CLI/Sources"
         ),

@@ -36,6 +36,25 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Command form used when launching WITH an initial prompt (codex needs a
+    /// trailing `--` so the prompt is a positional arg). Mirrors Superset.
+    public var promptCommand: String {
+        switch self {
+        case .codex: launchCommand + " --"
+        default: launchCommand
+        }
+    }
+
+    /// Build the exec'd command, optionally baking in an initial prompt as an argv
+    /// via a heredoc — Superset's approach: any prompt content (quotes, newlines)
+    /// passes literally, and the agent starts working immediately. No PTY keystrokes.
+    public func launch(prompt: String?) -> String {
+        guard let p = prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty else { return launchCommand }
+        var delim = "GINGERPAW_PROMPT_EOF"
+        while p.contains(delim) { delim += "_X" }
+        return "\(promptCommand) \"$(cat <<'\(delim)'\n\(p)\n\(delim)\n)\""
+    }
+
     /// Asset-catalog image name (bundled in the app).
     public var logo: String { "agent-\(rawValue)" }
 }

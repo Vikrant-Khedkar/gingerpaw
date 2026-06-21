@@ -8,12 +8,22 @@ final class AgentSession: Identifiable {
     let kind: AgentKind
     let terminal: LocalProcessTerminalView
 
-    init(kind: AgentKind, directory: String) {
+    init(kind: AgentKind, directory: String, prompt: String? = nil) {
         self.kind = kind
-        self.terminal = makeTerminal(directory: directory, command: kind.launchCommand)
+        self.terminal = makeTerminal(directory: directory, command: kind.launch(prompt: prompt))
     }
 
     func terminate() { terminal.terminate() }
+
+    /// Best-effort scrape of the visible terminal screen (raw rendered text).
+    func snapshot(maxLines: Int) -> String {
+        let t = terminal.getTerminal()
+        let rows = t.rows, cols = t.cols
+        guard rows > 0, cols > 0 else { return "" }
+        let startRow = max(0, rows - maxLines)
+        return t.getText(start: Position(col: 0, row: startRow),
+                         end: Position(col: cols - 1, row: rows - 1))
+    }
 }
 
 /// A workspace = a git worktree on its own branch. Agent sessions run inside it,
@@ -45,8 +55,8 @@ final class Workspace: Identifiable {
 
     var repoName: String { (repoPath as NSString).lastPathComponent }
 
-    func openSession(_ kind: AgentKind) {
-        let session = AgentSession(kind: kind, directory: worktreePath)
+    func openSession(_ kind: AgentKind, prompt: String? = nil) {
+        let session = AgentSession(kind: kind, directory: worktreePath, prompt: prompt)
         sessions.append(session)
         selectedSessionID = session.id
     }
@@ -79,6 +89,19 @@ final class Workspace: Identifiable {
                 }
             }
         }
+    }
+
+    /// Awaitable refresh — recomputes changes + full diff and returns only once set,
+    /// so an MCP read isn't stale (unlike fire-and-forget refreshDiff).
+    func refreshDiffAndWait() async {
+        let path = worktreePath
+        let files = await Task.detached { GitWorktrees.changedFiles(path) }.value
+        let full = await Task.detached { GitWorktrees.fullDiff(path) }.value
+        diff = DiffStat(files: files.count,
+                        insertions: files.reduce(0) { $0 + $1.insertions },
+                        deletions: files.reduce(0) { $0 + $1.deletions })
+        changes = files
+        fullDiff = full
     }
 
     func loadFullDiff() {
@@ -124,13 +147,23 @@ private struct PersistedWorkspace: Codable {
 @MainActor
 @Observable
 final class WorkspaceModel {
+    static let shared = WorkspaceModel()
+
     var workspaces: [Workspace] = []
     var selectedWorkspaceID: Workspace.ID?
     var installed: Set<AgentKind> = []
 
     private let storeKey = "agentWorkspaces"
 
-    init() { load() }
+    init() { load(); refreshInstalled() }
+
+    /// Ensure the installed-agents set is populated (the UI populates it on appear,
+    /// but the MCP bridge may run before any window has opened).
+    func ensureInstalled() async {
+        if installed.isEmpty {
+            installed = await Task.detached { AgentDetector.detectInstalled() }.value
+        }
+    }
 
     var selectedWorkspace: Workspace? {
         workspaces.first { $0.id == selectedWorkspaceID }
@@ -159,7 +192,8 @@ final class WorkspaceModel {
         }
     }
 
-    func createWorkspace(repoPath: String, branch: String) async throws {
+    @discardableResult
+    func createWorkspace(repoPath: String, branch: String) async throws -> Workspace {
         let path = try await Task.detached {
             try GitWorktrees.create(repoPath: repoPath, branch: branch)
         }.value
@@ -167,6 +201,8 @@ final class WorkspaceModel {
         workspaces.append(workspace)
         selectedWorkspaceID = workspace.id
         persist()
+        MCPConfig.wireWorktree(path)   // drop .mcp.json so agents here can orchestrate
+        return workspace
     }
 
     func removeWorkspace(_ id: Workspace.ID) {
