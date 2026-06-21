@@ -12,6 +12,7 @@ struct WorkspaceRootView: View {
     @State private var newAgent: AgentKind = .claude
     @State private var creating = false
     @State private var errorMessage: String?
+    @State private var showDiff = true
 
     private let diffTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
 
@@ -100,8 +101,10 @@ struct WorkspaceRootView: View {
                 }
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
 
-                DiffPanel(workspace: ws)
-                    .frame(minWidth: 260, idealWidth: 320, maxWidth: 480)
+                if showDiff {
+                    DiffPanel(workspace: ws)
+                        .frame(minWidth: 260, idealWidth: 320, maxWidth: 480)
+                }
             }
         } else {
             VStack(spacing: 10) {
@@ -117,6 +120,12 @@ struct WorkspaceRootView: View {
             ForEach(ws.sessions) { sessionTab(ws, $0) }
             addMenu(ws)
             Spacer()
+            Button { showDiff.toggle() } label: {
+                Image(systemName: "sidebar.right")
+                    .foregroundStyle(showDiff ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(showDiff ? "Hide changes panel" : "Show changes panel")
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(.background.secondary)
