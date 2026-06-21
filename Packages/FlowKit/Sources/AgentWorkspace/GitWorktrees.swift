@@ -55,6 +55,9 @@ enum GitWorktrees {
             throw GitError.failed("Invalid branch path")
         }
 
+        // Already a worktree on disk (e.g. from a prior unsaved session) — adopt it.
+        if FileManager.default.fileExists(atPath: dir), isGitRepo(dir) { return dir }
+
         try? FileManager.default.createDirectory(
             atPath: (dir as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         _ = try? run(["-C", repoPath, "worktree", "prune"])

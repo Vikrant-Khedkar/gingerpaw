@@ -81,6 +81,12 @@ final class Workspace: Identifiable {
     func terminateAll() { sessions.forEach { $0.terminate() } }
 }
 
+private struct PersistedWorkspace: Codable {
+    var repoPath: String
+    var branch: String
+    var worktreePath: String
+}
+
 @MainActor
 @Observable
 final class WorkspaceModel {
@@ -88,8 +94,28 @@ final class WorkspaceModel {
     var selectedWorkspaceID: Workspace.ID?
     var installed: Set<AgentKind> = []
 
+    private let storeKey = "agentWorkspaces"
+
+    init() { load() }
+
     var selectedWorkspace: Workspace? {
         workspaces.first { $0.id == selectedWorkspaceID }
+    }
+
+    /// Restore workspaces from disk, dropping any whose worktree is gone.
+    private func load() {
+        guard let data = UserDefaults.standard.data(forKey: storeKey),
+              let items = try? JSONDecoder().decode([PersistedWorkspace].self, from: data) else { return }
+        workspaces = items
+            .filter { FileManager.default.fileExists(atPath: $0.worktreePath) }
+            .map { Workspace(repoPath: $0.repoPath, branch: $0.branch, worktreePath: $0.worktreePath) }
+        selectedWorkspaceID = workspaces.first?.id
+        workspaces.forEach { $0.refreshDiff() }
+    }
+
+    private func persist() {
+        let items = workspaces.map { PersistedWorkspace(repoPath: $0.repoPath, branch: $0.branch, worktreePath: $0.worktreePath) }
+        if let data = try? JSONEncoder().encode(items) { UserDefaults.standard.set(data, forKey: storeKey) }
     }
 
     func refreshInstalled() {
@@ -106,6 +132,7 @@ final class WorkspaceModel {
         let workspace = Workspace(repoPath: repoPath, branch: branch, worktreePath: path)
         workspaces.append(workspace)
         selectedWorkspaceID = workspace.id
+        persist()
     }
 
     func removeWorkspace(_ id: Workspace.ID) {
@@ -116,6 +143,7 @@ final class WorkspaceModel {
         Task.detached { GitWorktrees.remove(repoPath: repo, worktreePath: path) }
         workspaces.remove(at: idx)
         if selectedWorkspaceID == id { selectedWorkspaceID = workspaces.last?.id }
+        persist()
     }
 
     func refreshDiffs() { workspaces.forEach { $0.refreshDiff() } }
