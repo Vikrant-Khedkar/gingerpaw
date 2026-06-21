@@ -48,17 +48,19 @@ struct WorkspaceRootView: View {
         Menu {
             ForEach(AgentKind.allCases) { kind in
                 let installed = model.installed.contains(kind)
-                Button {
+                Button(installed ? kind.title : "\(kind.title) — not installed") {
                     if let dir = pickDirectory() { model.open(kind, directory: dir) }
-                } label: {
-                    Label(installed ? kind.title : "\(kind.title) (not installed)", image: kind.logo)
                 }
                 .disabled(!installed)
             }
         } label: {
             Image(systemName: "plus")
+                .font(.system(size: 12, weight: .bold))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
     }
 
