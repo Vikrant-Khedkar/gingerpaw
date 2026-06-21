@@ -15,12 +15,23 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Binary probed on PATH and exec'd in the session.
+    /// Binary probed on PATH.
     public var binary: String {
         switch self {
         case .claude: "claude"
         case .codex: "codex"
         case .gemini: "gemini"
+        case .cursor: "cursor-agent"
+        }
+    }
+
+    /// Command exec'd in the session. Auto-approve flags (matching Superset) —
+    /// safe because every session runs in its own isolated git worktree.
+    public var launchCommand: String {
+        switch self {
+        case .claude: "claude --dangerously-skip-permissions"
+        case .codex: "codex --dangerously-bypass-approvals-and-sandbox"
+        case .gemini: "gemini --approval-mode=auto_edit"
         case .cursor: "cursor-agent"
         }
     }
