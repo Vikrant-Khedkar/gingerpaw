@@ -42,6 +42,11 @@ and steerable. A `.mcp.json` is auto-wired into every worktree (Claude Code) and
 
 All on-device. No cloud, no account.
 
+The talking cat works out of the box with the macOS `say` voice. For the **Kokoro
+neural voice**, open the **Voice** tab and click **Install Kokoro voice** — it sets up
+an isolated Python venv and downloads the 82M model (~200MB, needs `python3`). Until then
+it falls back to `say`.
+
 <sub><img src="docs/media/cat-demo.gif" alt="The talking cat announcing a finished task" width="520" /></sub>
 
 ## Requirements

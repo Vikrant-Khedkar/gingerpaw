@@ -17,7 +17,9 @@ struct VoiceView: View {
     private let kokoroVoices = ["af_bella", "af_sarah", "af_nicole", "af_sky",
                                 "am_adam", "am_michael",
                                 "bf_emma", "bf_isabella", "bm_george", "bm_lewis"]
-    private let kokoroAvailable = KokoroSynthesizer.isAvailable
+    @State private var kokoroInstalled = KokoroSynthesizer.isAvailable
+    @State private var kokoroInstalling = false
+    @State private var kokoroProgress = ""
 
     var body: some View {
         @Bindable var store = store
@@ -42,7 +44,7 @@ struct VoiceView: View {
                     sectionTitle("Voice")
                     Picker("Engine", selection: $store.ttsEngine) {
                         Text("System").tag("say")
-                        Text(kokoroAvailable ? "Kokoro — neural" : "Kokoro (not installed)").tag("kokoro")
+                        Text(kokoroInstalled ? "Kokoro — neural" : "Kokoro (not installed)").tag("kokoro")
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
@@ -57,9 +59,23 @@ struct VoiceView: View {
                             Slider(value: $store.kokoroSpeed, in: 0.7 ... 1.5)
                             Text(String(format: "%.2fx", store.kokoroSpeed)).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
                         }
-                        if !kokoroAvailable {
-                            Text("Kokoro isn't installed yet — GingerPaw falls back to the system voice until it is.")
-                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        if !kokoroInstalled {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Kokoro isn't installed — GingerPaw uses the system voice until it is. Setup downloads ~200MB (needs python3).")
+                                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                                Button {
+                                    installKokoro()
+                                } label: {
+                                    Label(kokoroInstalling ? "Installing…" : "Install Kokoro voice", systemImage: "arrow.down.circle")
+                                }
+                                .disabled(kokoroInstalling)
+                                if !kokoroProgress.isEmpty {
+                                    HStack(spacing: 6) {
+                                        if kokoroInstalling { ProgressView().controlSize(.small) }
+                                        Text(kokoroProgress).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                }
+                            }
                         }
                     } else {
                         Picker("Voice", selection: $store.voice) {
@@ -115,6 +131,21 @@ struct VoiceView: View {
             }
 
             Spacer()
+        }
+    }
+
+    private func installKokoro() {
+        kokoroInstalling = true
+        kokoroProgress = "Starting…"
+        Task {
+            do {
+                try await KokoroInstaller.install { kokoroProgress = $0 }
+                kokoroInstalled = KokoroSynthesizer.isAvailable
+                kokoroProgress = kokoroInstalled ? "Installed ✓" : "Finished, but model not found"
+            } catch {
+                kokoroProgress = "Failed: \(error.localizedDescription)"
+            }
+            kokoroInstalling = false
         }
     }
 
