@@ -14,7 +14,7 @@ public enum AgentWorkspaceWindow {
         }
         let hosting = NSHostingController(rootView: WorkspaceRootView())
         let window = NSWindow(contentViewController: hosting)
-        window.title = "gingerpaw"
+        window.title = ""
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         // Transparent, dark titlebar so the SwiftUI content draws its own (the
         // centered ginger wordmark) under the traffic lights.
