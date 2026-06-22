@@ -4,37 +4,53 @@
 
 # GingerPaw
 
-**Push-to-talk dictation for macOS — fully on-device.**
+**A multi-agent coding workspace for macOS — with on-device voice. Fully local.**
 
-Hold a hotkey, speak, release. Your words are transcribed locally with WhisperKit
-and pasted into whatever app you're in. And when your coding agent finishes a task,
-a ginger cat pops up and *tells you out loud* — so you can walk away. Nothing leaves your Mac.
+Run a whole team of coding agents in parallel — Claude Code, Codex, Gemini CLI, Cursor —
+each in its own git worktree. Agents can even spawn their own workspaces and launch other
+agents. Plus push-to-talk dictation and a talking ginger cat that speaks (in a neural voice)
+when an agent finishes. Nothing ever leaves your Mac.
 
 <br/>
 
-<img src="docs/media/cat-demo.gif" alt="GingerPaw's talking cat announcing a finished Claude Code task" width="720" />
-
-<sub>Dictated a task to Claude Code, wandered off to browse domains — the cat called me back when it was done.</sub>
+<img src="docs/media/agent-workspace.png" alt="GingerPaw Agent Workspace — coding agents running in parallel across git worktrees" width="900" />
 
 </div>
 
 ---
 
-## Features
+## What it does
 
-- **Push-to-talk** — hold **Fn or Right Option**, speak, release to paste.
-- **On-device transcription** — [WhisperKit](https://github.com/argmaxinc/WhisperKit) CoreML models run on the Neural Engine. No cloud, no account.
-- **Talking-cat agent notifications** — hook GingerPaw into [Claude Code](https://claude.com/claude-code) and a ginger cat appears and speaks a short summary every time the agent finishes or needs you. Walk away from your desk and still know when it's done.
-- **AI formatting (experimental, off by default)** — a local **Qwen 0.5B** model (via [MLX](https://github.com/ml-explore/mlx-swift)) restructures dictation into bullets/numbered lists while preserving your words. Toggle it on in Settings.
-- **Floating recording pill** — a dark capsule that turns red with a ginger-paw "purr" while recording, an animated waveform while transcribing.
-- **Native macOS UI** — `NavigationSplitView`, SF Symbols, grouped cards, status pills. Menu-bar resident.
-- **Clipboard-safe** — optionally restores your previous clipboard after pasting.
+### 🖥️ Agent Workspace
+Run multiple coding-agent CLIs side by side, each isolated:
+
+- **A tab per agent** — Claude Code, Codex, Gemini CLI, Cursor — real interactive terminals (SwiftTerm PTYs) running in-app.
+- **Git worktrees** — every workspace is a worktree on its own branch under `~/.gingerpaw/worktrees`, so agents work in parallel with zero collisions.
+- **Live diff panel** — Files / Changes / Review with `+/−` counts, one-click **Commit**, and **Create PR** (via `gh`).
+- **Ports + branch status** — detected dev-server ports and ahead/behind, right in the status bar.
+- Agents launch with auto-approve flags — safe, because each is sandboxed to its own worktree.
+
+### 🤖 Agents that orchestrate agents (MCP)
+GingerPaw runs an MCP server, so an agent running *inside* a workspace can drive the cockpit:
+**create new workspaces, launch other agents with a task, and read their diffs back.** Ask one
+agent for something and a whole team shows up in your sidebar, working in parallel — all visible
+and steerable. A `.mcp.json` is auto-wired into every worktree (Claude Code) and `~/.codex/config.toml` (Codex).
+
+### 🐈 Voice + dictation
+- **Push-to-talk dictation** — hold **Fn or Right Option**, speak, release; transcribed on-device with [WhisperKit](https://github.com/argmaxinc/WhisperKit) and pasted into any app.
+- **Talking-cat notifications** — when a coding agent finishes, a ginger cat pops up and speaks a summary in a natural **Kokoro (82M) neural TTS** voice (or macOS `say`). Walk away and still know when it's done.
+
+All on-device. No cloud, no account.
+
+<sub><img src="docs/media/cat-demo.gif" alt="The talking cat announcing a finished task" width="520" /></sub>
 
 ## Requirements
 
 - macOS 14+ (Apple Silicon)
 - Xcode 16+ with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) — required to compile MLX's GPU shaders.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
+- The agent CLIs you want to use (`claude`, `codex`, `gemini`, `cursor-agent`) on your `PATH`.
+- `gh` (optional) for Create PR. Kokoro TTS (optional) for the neural voice.
 
 ## Build
 
@@ -58,30 +74,18 @@ GingerPaw needs three macOS grants (surfaced in the in-app **Permissions** tab):
 | Input Monitoring | Detect the push-to-talk hotkey globally |
 | Accessibility | Paste text into the focused app |
 
-## Agent voice notifications (the talking cat)
-
-GingerPaw installs a [Claude Code hook](https://docs.claude.com/en/docs/claude-code/hooks) that fires when the agent stops or needs input. Claude writes its own one-line `<say>…</say>` summary; the bundled CLI reads it from the transcript and signals the app, which speaks it via macOS `say` while a ginger cat overlay pops up and lip-syncs the caption.
-
-Enable it from the in-app **Voice** tab (Install Hook), or point any Claude config's `settings.json` at the bundled CLI:
-
-```
-GingerPaw.app/Contents/MacOS/gingerpaw-cli notify --event stop
-```
-
-The app does the talking when it's running (cat + caption stay in sync); the CLI falls back to speaking headless if the app is closed.
-
 ## Architecture
 
 A thin SwiftUI app shell (`App/`) over **FlowKit** (`Packages/FlowKit`), a SwiftPM package of focused libraries:
 
-- `Dictation` — the `DictationCoordinator` state machine (`idle → recording → processing → inserting → copied/failed`)
-- `Audio` · `Transcription` (WhisperKit) · `TextInsertion` (clipboard + synthetic ⌘V)
-- `TextProcessing` — MLX/Qwen formatter behind a `TextProcessor` protocol
-- `Hotkeys` (global `CGEventTap`) · `Permissions` (TCC) · `Overlay` (the recording pill) · `Settings`
-- `AgentNotifications` — the `<say>` transcript parser + speech service shared by the app and the `gingerpaw-cli` hook binary
-- `AppCore` — composition + the Dictate / Voice / Permissions / Settings UI, plus the talking-cat `CatOverlayController`
+- `AgentWorkspace` — the multi-agent window: SwiftTerm terminals, git worktrees, the diff panel, ports/PR, and the **MCP bridge** (`MCPBridgeServer`) that lets agents drive the app over a loopback socket.
+- `AgentMCP` — shared Codable types for the MCP bridge (kept dependency-light so the `gingerpaw-cli` MCP binary stays small).
+- `AgentNotifications` — the `<say>` transcript parser + speech service shared by the app and the `gingerpaw-cli` hook binary.
+- `Dictation` — the `DictationCoordinator` state machine · `Audio` · `Transcription` (WhisperKit) · `TextInsertion`.
+- `TextProcessing` — MLX/Qwen formatter (experimental) · `Hotkeys` (global `CGEventTap`) · `Permissions` (TCC) · `Overlay` · `Settings`.
+- `AppCore` — composition + UI: the Agent Workspace, Dictate / Voice / Permissions / Settings, and the talking cat.
 
-Models are loaded from the app bundle if present (shippable offline), otherwise downloaded once to the Hugging Face cache and run on-device.
+`gingerpaw-cli` is the bundled helper binary: `notify` (the Claude Code voice hook) and `mcp` (the MCP server agents connect to).
 
 ## License
 

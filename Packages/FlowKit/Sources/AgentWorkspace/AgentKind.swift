@@ -25,8 +25,8 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Command exec'd in the session. Auto-approve flags (matching Superset) —
-    /// safe because every session runs in its own isolated git worktree.
+    /// Command exec'd in the session. Auto-approve flags so the agent runs
+    /// autonomously — safe because every session runs in its own isolated git worktree.
     public var launchCommand: String {
         switch self {
         // --mcp-config force-loads the worktree's .mcp.json (Claude won't auto-trust
@@ -41,7 +41,7 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
     /// Command form used when launching WITH an initial prompt. A trailing `--`
     /// terminates option parsing so the prompt is a clean positional — required for
     /// codex, and for claude because its variadic `--mcp-config` would otherwise
-    /// swallow the prompt as another config path. Mirrors Superset.
+    /// swallow the prompt as another config path.
     public var promptCommand: String {
         switch self {
         case .codex, .claude: launchCommand + " --"
@@ -50,8 +50,8 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// Build the exec'd command, optionally baking in an initial prompt as an argv
-    /// via a heredoc — Superset's approach: any prompt content (quotes, newlines)
-    /// passes literally, and the agent starts working immediately. No PTY keystrokes.
+    /// via a heredoc so any prompt content (quotes, newlines) passes literally,
+    /// and the agent starts working immediately. No PTY keystrokes.
     public func launch(prompt: String?) -> String {
         guard let p = prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty else { return launchCommand }
         var delim = "GINGERPAW_PROMPT_EOF"

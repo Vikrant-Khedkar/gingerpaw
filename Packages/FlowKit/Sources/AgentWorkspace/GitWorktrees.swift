@@ -21,8 +21,8 @@ public struct FileChange: Sendable, Identifiable, Equatable {
 
 enum GitError: Error { case failed(String) }
 
-/// Git worktree management — mirrors Superset's model: each workspace is a worktree
-/// on its own branch, kept outside the main checkout under ~/.gingerpaw/worktrees.
+/// Git worktree management — each workspace is a worktree on its own branch,
+/// kept outside the main checkout under ~/.gingerpaw/worktrees.
 enum GitWorktrees {
     static func root() -> String { NSHomeDirectory() + "/.gingerpaw/worktrees" }
 

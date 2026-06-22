@@ -1,5 +1,5 @@
 {
-  "originHash" : "57a0e4610a56adca5a306dcbbbe630d3e4566aeb2bab21d98eab586d85a6a9de",
+  "originHash" : "406975c6d8d1bd5fda62d3299a25c195e3716f74916acf5aed00e292b553a1ff",
   "pins" : [
     {
       "identity" : "argmax-oss-swift",
@@ -80,6 +80,15 @@
       "state" : {
         "revision" : "a2e184dddb4757bc943e77fbe99ac6786c53f0b2",
         "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "swiftterm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/migueldeicaza/SwiftTerm",
+      "state" : {
+        "revision" : "8e7a1e154f470e19c709a00a8768df348ba5fc43",
+        "version" : "1.13.0"
       }
     }
   ],
