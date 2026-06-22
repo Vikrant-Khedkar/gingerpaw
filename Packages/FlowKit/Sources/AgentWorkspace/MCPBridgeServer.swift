@@ -76,7 +76,7 @@ public final class MCPBridgeServer {
             let list = model.workspaces.map { ws in
                 IPCWorkspace(id: ws.id.uuidString, repoName: ws.repoName, repoPath: ws.repoPath, branch: ws.branch,
                              worktreePath: ws.worktreePath, insertions: ws.diff.insertions, deletions: ws.diff.deletions,
-                             files: ws.diff.files, sessions: ws.sessions.map { IPCSession(id: $0.id.uuidString, agent: $0.kind.rawValue) })
+                             files: ws.diff.files, sessions: ws.sessions.map { IPCSession(id: $0.id.uuidString, agent: $0.kind?.rawValue ?? "terminal") })
             }
             return IPCResponse(id: req.id, ok: true, result: IPCResult(workspaces: list))
 

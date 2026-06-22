@@ -59,6 +59,29 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         return "\(promptCommand) \"$(cat <<'\(delim)'\n\(p)\n\(delim)\n)\""
     }
 
+    /// Headless invocation that streams structured NDJSON events for a live activity
+    /// feed (no PTY). `nil` for agents without a parsed headless path yet — that gates
+    /// which agents can be dispatched as a Run. Claude emits one complete JSON object
+    /// per line (no --include-partial-messages → no delta accumulation). The task is
+    /// baked in as a positional via the same heredoc trick as `launch(prompt:)`.
+    public func headlessCommand(task: String, resumeSessionID: String? = nil) -> String? {
+        guard self == .claude else { return nil }
+        let t = task.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return nil }
+        var delim = "GINGERPAW_TASK_EOF"
+        while t.contains(delim) { delim += "_X" }
+        var base = "claude --output-format stream-json --verbose --dangerously-skip-permissions --mcp-config .mcp.json"
+        if let sid = resumeSessionID, !sid.isEmpty { base += " --resume \(sid)" }
+        base += " -p"
+        return "\(base) \"$(cat <<'\(delim)'\n\(t)\n\(delim)\n)\""
+    }
+
+    /// Interactive command that resumes the most recent conversation in the cwd
+    /// (Claude stores sessions per directory). `nil` for agents without it.
+    public var continueCommand: String? {
+        self == .claude ? "claude --continue --dangerously-skip-permissions --mcp-config .mcp.json" : nil
+    }
+
     /// Asset-catalog image name (bundled in the app).
     public var logo: String { "agent-\(rawValue)" }
 }

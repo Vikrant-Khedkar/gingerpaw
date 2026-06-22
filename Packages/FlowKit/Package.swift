@@ -59,5 +59,6 @@ let package = Package(
         ),
         .testTarget(name: "DictationTests", dependencies: ["Dictation"]),
         .testTarget(name: "TextInsertionTests", dependencies: ["TextInsertion"]),
+        .testTarget(name: "AgentWorkspaceTests", dependencies: ["AgentWorkspace"]),
     ]
 )

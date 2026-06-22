@@ -5,15 +5,30 @@ import SwiftUI
 @MainActor
 final class AgentSession: Identifiable {
     let id = UUID()
-    let kind: AgentKind
+    let kind: AgentKind?
     let terminal: LocalProcessTerminalView
 
-    init(kind: AgentKind, directory: String, prompt: String? = nil) {
+    /// `kind == nil` → a plain interactive shell (no agent), launched in the worktree.
+    /// `resume` → relaunch the agent continuing its last conversation in this directory.
+    init(kind: AgentKind?, directory: String, prompt: String? = nil, resume: Bool = false) {
         self.kind = kind
-        self.terminal = makeTerminal(directory: directory, command: kind.launch(prompt: prompt))
+        let command = resume ? (kind?.continueCommand ?? kind?.launch(prompt: prompt)) : kind?.launch(prompt: prompt)
+        self.terminal = makeTerminal(directory: directory, command: command)
     }
 
+    var title: String { kind?.title ?? "Terminal" }
+
     func terminate() { terminal.terminate() }
+
+    /// Type a prompt into the live agent and submit it. The Enter is sent as a separate
+    /// event after a short delay — Ink-based TUIs (Claude Code) drop a `\r` that arrives
+    /// in the same buffer as a large pasted block.
+    func sendPrompt(_ text: String) {
+        terminal.send(txt: text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak terminal] in
+            terminal?.send(txt: "\r")
+        }
+    }
 
     /// Best-effort scrape of the visible terminal screen (raw rendered text).
     func snapshot(maxLines: Int) -> String {
@@ -75,6 +90,21 @@ final class Workspace: Identifiable {
     func openSession(_ kind: AgentKind, prompt: String? = nil) {
         MCPConfig.wireWorktree(worktreePath)   // ensure .mcp.json exists before launch
         let session = AgentSession(kind: kind, directory: worktreePath, prompt: prompt)
+        sessions.append(session)
+        selectedSessionID = session.id
+    }
+
+    /// Open a plain interactive terminal in the worktree — no agent.
+    func openTerminal() {
+        let session = AgentSession(kind: nil, directory: worktreePath)
+        sessions.append(session)
+        selectedSessionID = session.id
+    }
+
+    /// Resume an agent's last conversation in this worktree (claude --continue).
+    func resumeSession(_ kind: AgentKind) {
+        MCPConfig.wireWorktree(worktreePath)
+        let session = AgentSession(kind: kind, directory: worktreePath, resume: true)
         sessions.append(session)
         selectedSessionID = session.id
     }
@@ -214,16 +244,25 @@ final class WorkspaceModel {
         }
     }
 
+    /// `plain` → work directly in the chosen folder (no worktree, no new branch). Use for
+    /// non-git roots with sub-repos, or to just open a repo in place. Otherwise a fresh
+    /// isolated worktree is created on `branch`.
     @discardableResult
-    func createWorkspace(repoPath: String, branch: String) async throws -> Workspace {
-        let path = try await Task.detached {
-            try GitWorktrees.create(repoPath: repoPath, branch: branch)
-        }.value
-        let workspace = Workspace(repoPath: repoPath, branch: branch, worktreePath: path)
+    func createWorkspace(repoPath: String, branch: String, plain: Bool = false) async throws -> Workspace {
+        let path: String
+        let actualBranch: String
+        if plain {
+            path = repoPath
+            actualBranch = GitWorktrees.currentBranch(repoPath)   // "" for a non-git folder
+        } else {
+            path = try await Task.detached { try GitWorktrees.create(repoPath: repoPath, branch: branch) }.value
+            actualBranch = branch
+        }
+        let workspace = Workspace(repoPath: repoPath, branch: actualBranch, worktreePath: path)
         workspaces.append(workspace)
         selectedWorkspaceID = workspace.id
         persist()
-        MCPConfig.wireWorktree(path)   // drop .mcp.json so agents here can orchestrate
+        MCPConfig.wireWorktree(path)   // drop .mcp.json so agents here can orchestrate (no-op git steps on non-git)
         return workspace
     }
 

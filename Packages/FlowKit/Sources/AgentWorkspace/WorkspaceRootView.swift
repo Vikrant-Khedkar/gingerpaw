@@ -1,32 +1,53 @@
 import AppKit
 import SwiftUI
 
+enum WorkspaceSection { case workspaces, runs }
+
 /// Agent Workspace — "Trail" layout: icon rail · workspaces sidebar · tabbed
 /// terminal + status bar · docked Files/Diff panel.
 struct WorkspaceRootView: View {
     @State private var model = WorkspaceModel.shared
+    @State private var section: WorkspaceSection = .workspaces
     @State private var showingNew = false
     @State private var newRepoPath = ""
     @State private var newBranch = "agent/work"
     @State private var newAgent: AgentKind = .claude
     @State private var newRepoCurrentBranch = ""
+    @State private var newPlain = false
     @State private var creating = false
     @State private var errorMessage: String?
     @State private var showDiff = true
+    @State private var hoveredWorkspaceID: Workspace.ID?
+    @State private var pendingRemoval: Workspace?
+    @State private var showingHandoff = false
+    @State private var handoffSize = 0
+    @State private var handoffLastSize = -1
+    @State private var handoffReady = false
+    @State private var pendingHandoff: PendingHandoff?
+    @State private var handoffWaited = 0
+    @State private var handoffHover = false
+
+    enum PendingHandoff: Equatable { case spawn(AgentKind); case copy(Bool) }
 
     private let diffTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
+    private let handoffTimer = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 0) {
             titleBar
             HStack(spacing: 0) {
                 iconRail
-                HSplitView {
-                    sidebar.frame(minWidth: 210, idealWidth: 248, maxWidth: 300)
-                    main.frame(minWidth: 440, maxWidth: .infinity)
-                    if showDiff, let ws = model.selectedWorkspace {
-                        DiffPanel(workspace: ws).frame(minWidth: 280, idealWidth: 320, maxWidth: 480)
+                switch section {
+                case .workspaces:
+                    HSplitView {
+                        sidebar.frame(minWidth: 210, idealWidth: 248, maxWidth: 300)
+                        main.frame(minWidth: 440, maxWidth: .infinity)
+                        if showDiff, let ws = model.selectedWorkspace {
+                            DiffPanel(workspace: ws).frame(minWidth: 280, idealWidth: 320, maxWidth: 480)
+                        }
                     }
+                case .runs:
+                    RunsView()
                 }
             }
         }
@@ -37,11 +58,23 @@ struct WorkspaceRootView: View {
         .preferredColorScheme(.dark)
         .onAppear { model.refreshInstalled() }
         .onReceive(diffTimer) { _ in model.selectedWorkspace?.refreshDiff() }
+        .onReceive(handoffTimer) { _ in if showingHandoff { pollHandoff() } }
         .sheet(isPresented: $showingNew) { newSheet }
+        .sheet(isPresented: $showingHandoff) { handoffSheet }
         .alert("Something went wrong",
                isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+        .alert("Remove workspace?",
+               isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+               presenting: pendingRemoval) { ws in
+            Button("Remove", role: .destructive) { model.removeWorkspace(ws.id); pendingRemoval = nil }
+            Button("Cancel", role: .cancel) { pendingRemoval = nil }
+        } message: { ws in
+            Text(ws.isMainCheckout
+                 ? "Removes “\(ws.repoName)” from the sidebar. Its sessions close; your repo and branch stay untouched."
+                 : "Closes all sessions and deletes the worktree for “\(ws.repoName)” (\(ws.branch)). Uncommitted changes there will be lost.")
+        }
     }
 
     // MARK: Titlebar
@@ -77,7 +110,8 @@ struct WorkspaceRootView: View {
 
     private var iconRail: some View {
         VStack(spacing: 4) {
-            railIcon("rectangle.stack", active: true) {}
+            railIcon("rectangle.stack", active: section == .workspaces) { section = .workspaces }
+            railIcon("bolt.horizontal.fill", active: section == .runs) { section = .runs }
             Spacer()
             railIcon("gearshape", active: false) {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
@@ -90,13 +124,21 @@ struct WorkspaceRootView: View {
         .overlay(alignment: .trailing) { Rectangle().fill(WS.border).frame(width: 1) }
     }
 
+    /// Rail icon — the selected one gets the ShaderGlow plasma behind it.
     private func railIcon(_ symbol: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(active ? Color(hex: 0xe9e9ec) : WS.textTertiary)
+                .foregroundStyle(active ? .white : WS.textTertiary)
+                .shadow(color: active ? .black.opacity(0.45) : .clear, radius: 1.5, y: 0.5)
                 .frame(width: 36, height: 36)
-                .background(active ? Color.white.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                .background {
+                    if active {
+                        ShaderGlow()
+                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(.white.opacity(0.18)))
+                    }
+                }
                 .overlay(alignment: .leading) {
                     if active { Capsule().fill(WS.accent).frame(width: 3, height: 18).offset(x: -8) }
                 }
@@ -140,12 +182,19 @@ struct WorkspaceRootView: View {
 
     private func workspaceRow(_ ws: Workspace) -> some View {
         let selected = model.selectedWorkspaceID == ws.id
+        let hovered = hoveredWorkspaceID == ws.id
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(ws.repoName).font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(selected ? WS.textPrimary : Color(hex: 0xd7d8db)).lineLimit(1)
                 Spacer(minLength: 6)
-                if !ws.sessions.isEmpty {
+                if hovered {
+                    Button { pendingRemoval = ws } label: {
+                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(WS.textSecondary)
+                            .frame(width: 17, height: 17).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                    }
+                    .buttonStyle(.plain).help("Remove workspace")
+                } else if !ws.sessions.isEmpty {
                     Circle().fill(WS.accent).frame(width: 7, height: 7)
                         .overlay(Circle().stroke(WS.accent.opacity(0.25), lineWidth: 3))
                 }
@@ -160,8 +209,9 @@ struct WorkspaceRootView: View {
         .background(selected ? WS.rowSelected : .clear, in: RoundedRectangle(cornerRadius: 7))
         .contentShape(Rectangle())
         .onTapGesture { model.selectedWorkspaceID = ws.id }
+        .onHover { hoveredWorkspaceID = $0 ? ws.id : (hoveredWorkspaceID == ws.id ? nil : hoveredWorkspaceID) }
         .contextMenu {
-            Button("Remove Workspace", role: .destructive) { model.removeWorkspace(ws.id) }
+            Button("Remove Workspace", role: .destructive) { pendingRemoval = ws }
         }
     }
 
@@ -196,6 +246,27 @@ struct WorkspaceRootView: View {
             ForEach(ws.sessions) { sessionTab(ws, $0) }
             addMenu(ws)
             Spacer()
+            if currentSession(ws) != nil {
+                Button { openHandoff() } label: {
+                    HStack(spacing: 5) {
+                        ZStack {
+                            Image("two-hands").renderingMode(.template).resizable().frame(width: 13, height: 13)
+                                .foregroundStyle(WS.textSecondary).opacity(handoffHover ? 0 : 1)
+                            if handoffHover {
+                                ShaderGlow().frame(width: 13, height: 13)
+                                    .mask(Image("two-hands").renderingMode(.template).resizable().frame(width: 13, height: 13))
+                            }
+                        }
+                        .frame(width: 13, height: 13)
+                        Text("Handoff").font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(WS.textSecondary)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain).help("Hand off this session's context to another agent").padding(.trailing, 4)
+                .onHover { handoffHover = $0 }
+            }
         }
         .padding(.horizontal, 10)
         .frame(height: 42)
@@ -206,9 +277,16 @@ struct WorkspaceRootView: View {
     private func sessionTab(_ ws: Workspace, _ session: AgentSession) -> some View {
         let selected = ws.selectedSessionID == session.id
         return HStack(spacing: 8) {
-            Image(session.kind.logo).resizable().frame(width: 14, height: 14)
-                .padding(2).background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
-            Text(session.kind.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
+            Group {
+                if let logo = session.kind?.logo {
+                    Image(logo).resizable().frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "terminal").font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WS.textSecondary).frame(width: 14, height: 14)
+                }
+            }
+            .padding(2).background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+            Text(session.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? WS.textPrimary : WS.textSecondary).lineLimit(1)
             Button { ws.closeSession(session.id) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(WS.textTertiary)
@@ -232,6 +310,16 @@ struct WorkspaceRootView: View {
                     Label { Text(installed ? kind.title : "\(kind.title) — not installed") } icon: { Self.agentIcon(kind) }
                 }
                 .disabled(!installed)
+            }
+            Divider()
+            ForEach(AgentKind.allCases.filter { $0.continueCommand != nil }) { kind in
+                Button { ws.resumeSession(kind) } label: {
+                    Label { Text("Resume \(kind.title)") } icon: { Image(systemName: "arrow.clockwise") }
+                }
+                .disabled(!model.installed.contains(kind))
+            }
+            Button { ws.openTerminal() } label: {
+                Label { Text("Terminal") } icon: { Image(systemName: "terminal") }
             }
         } label: {
             Image(systemName: "plus").font(.system(size: 14, weight: .semibold)).foregroundStyle(WS.textSecondary)
@@ -314,8 +402,34 @@ struct WorkspaceRootView: View {
                 .frame(width: 54, height: 54).background(Color(hex: 0x17181c), in: RoundedRectangle(cornerRadius: 14))
                 .padding(.bottom, 8)
             Text("No agent session yet").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color(hex: 0xd7d8db))
-            Text("Sessions share this workspace's worktree. Open one to start coding with an agent.")
-                .font(.system(size: 12.5)).foregroundStyle(WS.textTertiary).multilineTextAlignment(.center).frame(maxWidth: 280)
+            Text("Sessions share this workspace's worktree. Resume your last conversation, or start fresh.")
+                .font(.system(size: 12.5)).foregroundStyle(WS.textTertiary).multilineTextAlignment(.center).frame(maxWidth: 300)
+
+            ForEach(AgentKind.allCases.filter { $0.continueCommand != nil && model.installed.contains($0) }) { kind in
+                Button { ws.resumeSession(kind) } label: {
+                    Label("Resume \(kind.title)", systemImage: "arrow.clockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(PrimaryButtonStyle()).padding(.top, 10)
+            }
+
+            Text("START FRESH").font(.system(size: 9.5, weight: .bold)).tracking(1.2).foregroundStyle(WS.textDim).padding(.top, 6)
+            HStack(spacing: 8) {
+                ForEach(AgentKind.allCases.filter { model.installed.contains($0) }) { kind in
+                    Button { ws.openSession(kind) } label: {
+                        Image(kind.logo).resizable().frame(width: 15, height: 15)
+                            .padding(8).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.1)))
+                    }
+                    .buttonStyle(.plain).help("New \(kind.title) session")
+                }
+                Button { ws.openTerminal() } label: {
+                    Image(systemName: "terminal").font(.system(size: 14)).foregroundStyle(WS.textSecondary)
+                        .frame(width: 31, height: 31).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.1)))
+                }
+                .buttonStyle(.plain).help("Plain terminal")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -350,31 +464,44 @@ struct WorkspaceRootView: View {
                 Text("New Workspace").font(.system(size: 15, weight: .semibold)).foregroundStyle(WS.textPrimary)
             }
 
-            field("Repository") {
+            field("Mode") {
                 HStack(spacing: 8) {
-                    Text(newRepoPath.isEmpty ? "Choose a git repo…" : newRepoPath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    modeSegment("New branch", subtitle: "isolated worktree", icon: "arrow.triangle.branch", selected: !newPlain) { newPlain = false }
+                    modeSegment("This folder", subtitle: "work in place", icon: "folder", selected: newPlain) { newPlain = true }
+                }
+                Text(newPlain
+                     ? "Runs the agent directly in the chosen folder — no worktree, no branch. Use for a root with sub-repos or to edit a repo in place."
+                     : "Creates an isolated git worktree on a new branch. Requires a git repo.")
+                    .font(.system(size: 11)).foregroundStyle(WS.textDim)
+            }
+
+            field(newPlain ? "Folder" : "Repository") {
+                HStack(spacing: 8) {
+                    Text(newRepoPath.isEmpty ? (newPlain ? "Choose a folder…" : "Choose a git repo…") : newRepoPath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                         .font(WS.mono(12)).foregroundStyle(newRepoPath.isEmpty ? WS.textTertiary : Color(hex: 0xd7d8db))
                         .lineLimit(1).truncationMode(.middle).frame(maxWidth: .infinity, alignment: .leading)
                         .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.1)))
                     Button("Browse…") {
-                        if let p = pickRepo() { newRepoPath = p; newRepoCurrentBranch = GitWorktrees.currentBranch(p) }
+                        if let p = pickRepo(requireGit: !newPlain) { newRepoPath = p; newRepoCurrentBranch = GitWorktrees.currentBranch(p) }
                     }.buttonStyle(SecondaryButtonStyle())
                 }
             }
 
-            field("Branch") {
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("agent/work", text: $newBranch)
-                        .textFieldStyle(.plain).font(WS.mono(12)).foregroundStyle(WS.textPrimary)
-                        .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(WS.accent.opacity(0.5)))
-                    if !newRepoCurrentBranch.isEmpty && newBranch != newRepoCurrentBranch {
-                        Button { newBranch = newRepoCurrentBranch } label: {
-                            Text("↩ use current branch (\(newRepoCurrentBranch)) — work in the repo directly")
-                                .font(.system(size: 11)).foregroundStyle(WS.accent)
+            if !newPlain {
+                field("Branch") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("agent/work", text: $newBranch)
+                            .textFieldStyle(.plain).font(WS.mono(12)).foregroundStyle(WS.textPrimary)
+                            .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(WS.accent.opacity(0.5)))
+                        if !newRepoCurrentBranch.isEmpty && newBranch != newRepoCurrentBranch {
+                            Button { newBranch = newRepoCurrentBranch } label: {
+                                Text("↩ use current branch (\(newRepoCurrentBranch)) — work in the repo directly")
+                                    .font(.system(size: 11)).foregroundStyle(WS.accent)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -404,11 +531,29 @@ struct WorkspaceRootView: View {
                 Button("Cancel") { showingNew = false }.buttonStyle(.plain).foregroundStyle(Color(hex: 0xd7d8db))
                 Button(creating ? "Creating…" : "Create") { create() }
                     .buttonStyle(PrimaryButtonStyle()).keyboardShortcut(.defaultAction)
-                    .disabled(newRepoPath.isEmpty || newBranch.trimmingCharacters(in: .whitespaces).isEmpty || !model.installed.contains(newAgent) || creating)
+                    .disabled(newRepoPath.isEmpty || (!newPlain && newBranch.trimmingCharacters(in: .whitespaces).isEmpty) || !model.installed.contains(newAgent) || creating)
             }
             .padding(.top, 4)
         }
         .padding(22).frame(width: 460).background(Color(hex: 0x26272d))
+    }
+
+    private func modeSegment(_ title: String, subtitle: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon).font(.system(size: 12)).foregroundStyle(selected ? WS.accent : WS.textTertiary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(selected ? WS.textPrimary : Color(hex: 0xd7d8db))
+                    Text(subtitle).font(.system(size: 10.5)).foregroundStyle(WS.textTertiary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 11).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selected ? WS.accentSubtle : Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? WS.accent.opacity(0.6) : .white.opacity(0.1)))
+        }
+        .buttonStyle(.plain)
     }
 
     private func field<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
@@ -421,6 +566,7 @@ struct WorkspaceRootView: View {
     private func openNewWorkspace() {
         newRepoPath = ""
         newRepoCurrentBranch = ""
+        newPlain = false
         newBranch = "agent/work-\(model.workspaces.count + 1)"
         newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude
         showingNew = true
@@ -440,13 +586,113 @@ struct WorkspaceRootView: View {
 
     private func create() {
         creating = true
-        let repo = newRepoPath, branch = newBranch, agent = newAgent
+        let repo = newRepoPath, branch = newBranch, agent = newAgent, plain = newPlain
         Task {
             do {
-                try await model.createWorkspace(repoPath: repo, branch: branch)
+                try await model.createWorkspace(repoPath: repo, branch: branch, plain: plain)
                 model.selectedWorkspace?.openSession(agent)
                 creating = false; showingNew = false
             } catch { creating = false; errorMessage = "\(error)" }
+        }
+    }
+
+    // MARK: Handoff
+
+    private func currentSession(_ ws: Workspace) -> AgentSession? {
+        ws.sessions.first { $0.id == ws.selectedSessionID }
+    }
+
+    private func openHandoff() {
+        handoffSize = 0; handoffLastSize = -1; handoffReady = false; pendingHandoff = nil
+        showingHandoff = true
+    }
+
+    /// Begin a handoff: clear any old file, ask the current agent to write a fresh one,
+    /// and remember what to do once it lands. Polling (every 1.5s) finishes the job.
+    private func startHandoff(_ action: PendingHandoff) {
+        guard let ws = model.selectedWorkspace, let session = currentSession(ws) else { return }
+        try? FileManager.default.removeItem(atPath: Handoff.path(ws.worktreePath))
+        handoffReady = false; handoffLastSize = -1; handoffSize = 0; handoffWaited = 0
+        pendingHandoff = action
+        session.sendPrompt(Handoff.authorPrompt)
+    }
+
+    private func pollHandoff() {
+        guard let ws = model.selectedWorkspace else { return }
+        if pendingHandoff != nil { handoffWaited += 1 }
+        let s = Handoff.status(ws.worktreePath)
+        handoffSize = s.size
+        if s.exists, s.size > 0, s.size == handoffLastSize { handoffReady = true }
+        handoffLastSize = s.size
+
+        if handoffReady, let action = pendingHandoff {
+            pendingHandoff = nil
+            switch action {
+            case .spawn(let kind): ws.openSession(kind, prompt: Handoff.continuePrompt)
+            case .copy(let diff): copyHandoff(ws, withDiff: diff)
+            }
+            showingHandoff = false
+        }
+    }
+
+    private func copyHandoff(_ ws: Workspace, withDiff: Bool) {
+        guard let content = Handoff.read(ws.worktreePath) else { return }
+        var text = "Continue this work. Context from the previous agent:\n\n" + content
+        if withDiff { text += "\n\n## Current diff\n```diff\n" + GitWorktrees.fullDiff(ws.worktreePath) + "\n```" }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    @ViewBuilder private var handoffSheet: some View {
+        if let ws = model.selectedWorkspace, let session = currentSession(ws) {
+            let working = pendingHandoff != nil
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 9) {
+                    Image("two-hands").renderingMode(.template).resizable().frame(width: 15, height: 15).foregroundStyle(WS.accent)
+                        .frame(width: 26, height: 26).background(WS.accentSubtle, in: RoundedRectangle(cornerRadius: 8))
+                    Text("Hand off \(session.title)").font(.system(size: 15, weight: .semibold)).foregroundStyle(WS.textPrimary)
+                }
+                Text("The next agent shares this worktree, so it already has the code. \(session.title) writes the intent to HANDOFF.md, then the chosen agent picks it up — automatically.")
+                    .font(.system(size: 11.5)).foregroundStyle(WS.textTertiary)
+
+                field("Continue in") {
+                    HStack(spacing: 8) {
+                        ForEach(AgentKind.allCases) { kind in
+                            Button { startHandoff(.spawn(kind)) } label: {
+                                HStack(spacing: 6) { Image(kind.logo).resizable().frame(width: 13, height: 13); Text(kind.title).font(.system(size: 12)) }
+                                    .padding(.horizontal, 10).padding(.vertical, 6)
+                                    .background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 7))
+                                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(.white.opacity(0.1)))
+                            }
+                            .buttonStyle(.plain).disabled(working || !model.installed.contains(kind))
+                            .opacity(!working && model.installed.contains(kind) ? 1 : 0.4)
+                        }
+                    }
+                }
+
+                if working {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 7) {
+                            ProgressView().controlSize(.small)
+                            Text("Asking \(session.title) to write HANDOFF.md…").font(.system(size: 11.5)).foregroundStyle(WS.textTertiary)
+                        }
+                        if handoffWaited > 8 {
+                            Text("If the prompt is sitting unsent in the terminal, press Enter to submit it.")
+                                .font(.system(size: 11)).foregroundStyle(WS.del)
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("Copy") { startHandoff(.copy(false)) }.buttonStyle(SecondaryButtonStyle()).disabled(working)
+                    Button("Copy + diff") { startHandoff(.copy(true)) }.buttonStyle(SecondaryButtonStyle()).disabled(working)
+                    Text("to paste into a Claude open elsewhere").font(.system(size: 10.5)).foregroundStyle(WS.textDim)
+                    Spacer()
+                    Button(working ? "Cancel" : "Done") { pendingHandoff = nil; showingHandoff = false }
+                        .buttonStyle(.plain).foregroundStyle(Color(hex: 0xd7d8db))
+                }
+            }
+            .padding(22).frame(width: 500).background(Color(hex: 0x26272d))
         }
     }
 
@@ -456,13 +702,13 @@ struct WorkspaceRootView: View {
         return Image(nsImage: copy)
     }
 
-    private func pickRepo() -> String? {
+    private func pickRepo(requireGit: Bool = true) -> String? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        panel.prompt = "Select Repo"
+        panel.prompt = "Select"
         guard panel.runModal() == .OK, let path = panel.url?.path else { return nil }
-        guard GitWorktrees.isGitRepo(path) else { errorMessage = "Not a git repository:\n\(path)"; return nil }
+        if requireGit, !GitWorktrees.isGitRepo(path) { errorMessage = "Not a git repository:\n\(path)"; return nil }
         return path
     }
 }

@@ -56,8 +56,9 @@ enum GitWorktrees {
         return s.trimmingCharacters(in: CharacterSet(charactersIn: "-/."))
     }
 
-    /// Creates (or adopts) a worktree for `branch` off `repoPath`. Returns its path.
-    static func create(repoPath: String, branch rawBranch: String) throws -> String {
+    /// Creates (or adopts) a worktree for `branch` off `repoPath`, branched from `base`
+    /// (default HEAD; a prior branch for sequential chains). Returns its path.
+    static func create(repoPath: String, branch rawBranch: String, base: String = "HEAD") throws -> String {
         let branch = sanitizeBranch(rawBranch)
         guard !branch.isEmpty else { throw GitError.failed("Invalid branch name") }
 
@@ -83,7 +84,7 @@ enum GitWorktrees {
         if branchExists {
             try run(["-C", repoPath, "worktree", "add", dir, branch])
         } else {
-            try run(["-C", repoPath, "worktree", "add", "--no-track", "-b", branch, dir, "HEAD"])
+            try run(["-C", repoPath, "worktree", "add", "--no-track", "-b", branch, dir, base])
         }
         return dir
     }
@@ -91,6 +92,34 @@ enum GitWorktrees {
     static func remove(repoPath: String, worktreePath: String) {
         _ = try? run(["-C", repoPath, "worktree", "remove", "--force", worktreePath])
         _ = try? run(["-C", repoPath, "worktree", "prune"])
+    }
+
+    /// The repo's base branch: origin/HEAD if set, else main/master if present, else current.
+    static func defaultBranch(_ repoPath: String) -> String {
+        let head = runRaw(["-C", repoPath, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if head.hasPrefix("origin/") { return String(head.dropFirst("origin/".count)) }
+        let locals = localBranches(repoPath)
+        for candidate in ["main", "master"] where locals.contains(candidate) { return candidate }
+        return currentBranch(repoPath)
+    }
+
+    enum MergeResult: Sendable { case merged, conflict, failed(String) }
+
+    /// Merge `branch` into `base` in the main checkout. Aborts cleanly on conflict so the
+    /// working tree is never left half-merged. Arg-array only — no shell interpolation.
+    static func mergeIntoBase(repoPath: String, branch: String, base: String) -> MergeResult {
+        // Must be on `base` and clean to merge safely.
+        guard (try? run(["-C", repoPath, "checkout", base])) != nil else {
+            return .failed("couldn't checkout \(base)")
+        }
+        do {
+            try run(["-C", repoPath, "merge", "--no-ff", "-m", "Merge \(branch) into \(base)", branch])
+            return .merged
+        } catch {
+            _ = try? run(["-C", repoPath, "merge", "--abort"])
+            return .conflict
+        }
     }
 
     /// Changes vs HEAD in the worktree (tracked + staged). Drives the sidebar badge.
