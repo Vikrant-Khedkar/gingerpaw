@@ -62,6 +62,12 @@ xcodebuild -project GingerPaw.xcodeproj -scheme GingerPaw \
 
 > MLX requires Xcode's build system to compile the Metal kernels — a plain `swift build` will not produce the metallib. Use `xcodebuild` (or open the project in Xcode).
 
+The build is self-contained: a build phase also compiles and bundles `gingerpaw-cli`
+(the voice + MCP helper) into the `.app`, so a fresh clone builds a complete, runnable app —
+no extra steps. First launch downloads the WhisperKit model once; grant the three permissions
+below. Install the agent CLIs you want (`claude`, `codex`, `gemini`, `cursor-agent`) to use the
+Agent Workspace.
+
 Run `swift test` inside `Packages/FlowKit` for the unit tests.
 
 ## Permissions

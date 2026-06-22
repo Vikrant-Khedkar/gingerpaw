@@ -20,6 +20,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     DEAD_CODE_STRIPPING: YES
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
 
 packages:
   FlowKit:
@@ -45,6 +46,18 @@ targets:
     dependencies:
       - package: FlowKit
         product: AppCore
+    postBuildScripts:
+      - name: Bundle gingerpaw-cli (voice + MCP helper)
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          CONFIG_LC=$(echo "${CONFIGURATION:-Debug}" | tr '[:upper:]' '[:lower:]')
+          cd "$SRCROOT"
+          swift build -c "$CONFIG_LC" --product flowoss
+          DEST="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/gingerpaw-cli"
+          cp -f ".build/$CONFIG_LC/flowoss" "$DEST"
+          codesign --force --timestamp=none --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$DEST" 2>/dev/null \
+            || codesign --force --sign - "$DEST" 2>/dev/null || true
 
 schemes:
   GingerPaw:
