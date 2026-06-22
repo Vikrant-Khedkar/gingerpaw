@@ -46,11 +46,28 @@ final class Workspace: Identifiable {
     var ahead = 0
     var behind = 0
     var creatingPR = false
+    var currentBranch: String
+    var branches: [String] = []
+
+    /// True when this workspace points at the repo's main checkout (current branch),
+    /// not an isolated worktree.
+    var isMainCheckout: Bool { worktreePath == repoPath }
 
     init(repoPath: String, branch: String, worktreePath: String) {
         self.repoPath = repoPath
         self.branch = branch
         self.worktreePath = worktreePath
+        self.currentBranch = branch
+    }
+
+    func switchBranch(_ name: String) {
+        guard name != currentBranch else { return }
+        let path = worktreePath
+        Task.detached {
+            try? GitWorktrees.checkout(path, branch: name)
+            let cur = GitWorktrees.currentBranch(path)
+            await MainActor.run { self.currentBranch = cur; self.refreshDiff() }
+        }
     }
 
     var repoName: String { (repoPath as NSString).lastPathComponent }
@@ -78,12 +95,16 @@ final class Workspace: Identifiable {
                                 deletions: files.reduce(0) { $0 + $1.deletions })
             let ports = GitWorktrees.listeningPorts(path)
             let ab = GitWorktrees.aheadBehind(path)
+            let cur = GitWorktrees.currentBranch(path)
+            let brs = GitWorktrees.localBranches(path)
             await MainActor.run {
                 self.diff = stat
                 self.changes = files
                 self.ports = ports
                 self.ahead = ab?.ahead ?? 0
                 self.behind = ab?.behind ?? 0
+                self.currentBranch = cur
+                self.branches = brs
                 if let sel = self.selectedFile, !files.contains(where: { $0.path == sel }) {
                     self.selectedFile = nil
                     self.fileDiff = ""
@@ -211,7 +232,9 @@ final class WorkspaceModel {
         let workspace = workspaces[idx]
         workspace.terminateAll()
         let repo = workspace.repoPath, path = workspace.worktreePath
-        Task.detached { GitWorktrees.remove(repoPath: repo, worktreePath: path) }
+        if path != repo {   // never delete the main checkout
+            Task.detached { GitWorktrees.remove(repoPath: repo, worktreePath: path) }
+        }
         workspaces.remove(at: idx)
         if selectedWorkspaceID == id { selectedWorkspaceID = workspaces.last?.id }
         persist()

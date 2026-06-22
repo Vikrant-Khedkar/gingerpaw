@@ -9,6 +9,7 @@ struct WorkspaceRootView: View {
     @State private var newRepoPath = ""
     @State private var newBranch = "agent/work"
     @State private var newAgent: AgentKind = .claude
+    @State private var newRepoCurrentBranch = ""
     @State private var creating = false
     @State private var errorMessage: String?
     @State private var showDiff = true
@@ -252,7 +253,20 @@ struct WorkspaceRootView: View {
 
     private func statusBar(_ ws: Workspace) -> some View {
         HStack(spacing: 10) {
-            Text(ws.branch).font(WS.mono(11)).foregroundStyle(WS.textSecondary)
+            Menu {
+                ForEach(ws.branches, id: \.self) { b in
+                    Button { ws.switchBranch(b) } label: {
+                        if b == ws.currentBranch { Label(b, systemImage: "checkmark") } else { Text(b) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.branch").font(.system(size: 10))
+                    Text(ws.currentBranch).font(WS.mono(11))
+                }
+                .foregroundStyle(WS.textSecondary)
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             diffBadge(ws.diff)
             ForEach(ws.ports, id: \.self) { port in
                 HStack(spacing: 5) {
@@ -343,15 +357,26 @@ struct WorkspaceRootView: View {
                         .lineLimit(1).truncationMode(.middle).frame(maxWidth: .infinity, alignment: .leading)
                         .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.1)))
-                    Button("Browse…") { if let p = pickRepo() { newRepoPath = p } }.buttonStyle(SecondaryButtonStyle())
+                    Button("Browse…") {
+                        if let p = pickRepo() { newRepoPath = p; newRepoCurrentBranch = GitWorktrees.currentBranch(p) }
+                    }.buttonStyle(SecondaryButtonStyle())
                 }
             }
 
             field("Branch") {
-                TextField("agent/work", text: $newBranch)
-                    .textFieldStyle(.plain).font(WS.mono(12)).foregroundStyle(WS.textPrimary)
-                    .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(WS.accent.opacity(0.5)))
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("agent/work", text: $newBranch)
+                        .textFieldStyle(.plain).font(WS.mono(12)).foregroundStyle(WS.textPrimary)
+                        .padding(9).background(Color(hex: 0x1a1b1f), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(WS.accent.opacity(0.5)))
+                    if !newRepoCurrentBranch.isEmpty && newBranch != newRepoCurrentBranch {
+                        Button { newBranch = newRepoCurrentBranch } label: {
+                            Text("↩ use current branch (\(newRepoCurrentBranch)) — work in the repo directly")
+                                .font(.system(size: 11)).foregroundStyle(WS.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
 
             field("Agent") {
@@ -395,6 +420,7 @@ struct WorkspaceRootView: View {
 
     private func openNewWorkspace() {
         newRepoPath = ""
+        newRepoCurrentBranch = ""
         newBranch = "agent/work-\(model.workspaces.count + 1)"
         newAgent = AgentKind.allCases.first { model.installed.contains($0) } ?? .claude
         showingNew = true

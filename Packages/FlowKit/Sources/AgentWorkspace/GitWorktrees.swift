@@ -31,6 +31,19 @@ enum GitWorktrees {
             .trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 
+    static func currentBranch(_ path: String) -> String {
+        runRaw(["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func localBranches(_ path: String) -> [String] {
+        runRaw(["-C", path, "branch", "--format=%(refname:short)"])
+            .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    static func checkout(_ path: String, branch: String) throws {
+        try run(["-C", path, "checkout", branch])
+    }
+
     /// Best-effort scrub of a user-typed branch name into a legal-ish git ref:
     /// keep word chars + - _ . /, turn everything else into '-', collapse repeats,
     /// strip leading/trailing separators.
@@ -47,6 +60,10 @@ enum GitWorktrees {
     static func create(repoPath: String, branch rawBranch: String) throws -> String {
         let branch = sanitizeBranch(rawBranch)
         guard !branch.isEmpty else { throw GitError.failed("Invalid branch name") }
+
+        // If the requested branch is already checked out in the main repo, git can't
+        // make a second worktree for it — so work in the main checkout directly.
+        if branch == currentBranch(repoPath) { return repoPath }
         let repoName = (repoPath as NSString).lastPathComponent
         let projectRoot = (root() as NSString).appendingPathComponent(repoName)
         let dir = (projectRoot as NSString).appendingPathComponent(branch)
