@@ -43,6 +43,8 @@ targets:
         LSUIElement: false
         NSMicrophoneUsageDescription: "GingerPaw records your voice so it can transcribe dictation locally."
         NSHumanReadableCopyright: "© 2026 GingerPaw contributors"
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     dependencies:
       - package: FlowKit
         product: AppCore

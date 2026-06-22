@@ -1,3 +1,4 @@
+import AgentWorkspace
 import Audio
 import Dictation
 import Hotkeys
@@ -42,6 +43,10 @@ public enum AppComposition {
         )
         let hotkeyMonitor = RightOptionHotkeyMonitor()
         hotkeyMonitor.hotkeyProvider = { settings.hotkey }
+
+        // Let the Agent Workspace transcribe feedback audio with the same engine, without
+        // depending on the Transcription target directly.
+        FeedbackTranscription.transcribe = { url in try? await transcriber.transcribe(audioURL: url) }
         return AppServices(
             settings: settings,
             permissions: PermissionCenter(),
