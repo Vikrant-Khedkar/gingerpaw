@@ -15,7 +15,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "0.0.1"
+    MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     DEAD_CODE_STRIPPING: YES
@@ -33,6 +33,12 @@ targets:
     sources:
       - App/Sources
       - App/Resources/Assets.xcassets
+      # Folder reference (verbatim copy → Resources/Models) so the bundled WhisperKit
+      # CoreML model isn't recompiled. Staged by scripts/release.sh; gitignored.
+      - path: App/Resources/Models
+        type: folder
+        buildPhase: resources
+        optional: true
     info:
       path: App/Resources/Info.plist
       properties:

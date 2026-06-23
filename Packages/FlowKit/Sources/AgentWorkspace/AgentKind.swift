@@ -25,13 +25,21 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Resolved `claude` executable. Prefers the native-installer build at
+    /// ~/.local/bin/claude (auto-updates) over an older Homebrew cask that may shadow it
+    /// earlier on PATH. Falls back to bare `claude`.
+    public static var claudeExe: String {
+        let local = NSHomeDirectory() + "/.local/bin/claude"
+        return FileManager.default.isExecutableFile(atPath: local) ? local : "claude"
+    }
+
     /// Command exec'd in the session. Auto-approve flags so the agent runs
     /// autonomously — safe because every session runs in its own isolated git worktree.
     public var launchCommand: String {
         switch self {
         // --mcp-config force-loads the worktree's .mcp.json (Claude won't auto-trust
         // a project MCP server otherwise). cwd is the worktree, so the path is relative.
-        case .claude: "claude --dangerously-skip-permissions --mcp-config .mcp.json"
+        case .claude: "\(Self.claudeExe) --dangerously-skip-permissions --mcp-config .mcp.json"
         case .codex: "codex --dangerously-bypass-approvals-and-sandbox"
         case .gemini: "gemini --approval-mode=auto_edit"
         case .cursor: "cursor-agent"
@@ -70,7 +78,7 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
         guard !t.isEmpty else { return nil }
         var delim = "GINGERPAW_TASK_EOF"
         while t.contains(delim) { delim += "_X" }
-        var base = "claude --output-format stream-json --verbose --dangerously-skip-permissions --mcp-config .mcp.json"
+        var base = "\(Self.claudeExe) --output-format stream-json --verbose --dangerously-skip-permissions --mcp-config .mcp.json"
         if let sid = resumeSessionID, !sid.isEmpty { base += " --resume \(sid)" }
         base += " -p"
         return "\(base) \"$(cat <<'\(delim)'\n\(t)\n\(delim)\n)\""
@@ -79,7 +87,7 @@ public enum AgentKind: String, CaseIterable, Identifiable, Sendable {
     /// Interactive command that resumes the most recent conversation in the cwd
     /// (Claude stores sessions per directory). `nil` for agents without it.
     public var continueCommand: String? {
-        self == .claude ? "claude --continue --dangerously-skip-permissions --mcp-config .mcp.json" : nil
+        self == .claude ? "\(Self.claudeExe) --continue --dangerously-skip-permissions --mcp-config .mcp.json" : nil
     }
 
     /// Asset-catalog image name (bundled in the app).

@@ -19,3 +19,10 @@ models/
 # macOS
 .DS_Store
 *.xcuserstate
+
+# bundled models (staged at release-build time, not committed)
+App/Resources/Models/
+# release artifacts
+dist/
+dd-release/
+dd/
