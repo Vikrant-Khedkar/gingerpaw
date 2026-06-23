@@ -13,6 +13,15 @@ when an agent finishes. Nothing ever leaves your Mac.
 
 <br/>
 
+### [⬇️ Download GingerPaw for macOS](https://github.com/Vikrant-Khedkar/gingerpaw/releases/latest)
+
+[![Latest release](https://img.shields.io/github/v/release/Vikrant-Khedkar/gingerpaw?label=download&style=for-the-badge&color=db7e14)](https://github.com/Vikrant-Khedkar/gingerpaw/releases/latest)
+
+macOS 14+ · Apple Silicon · self-contained (voice model bundled). Unsigned build — first launch:
+**right-click → Open**, or `xattr -dr com.apple.quarantine /Applications/GingerPaw.app`.
+
+<br/>
+
 <img src="docs/media/agent-workspace.png" alt="GingerPaw Agent Workspace — coding agents running in parallel across git worktrees" width="900" />
 
 </div>
