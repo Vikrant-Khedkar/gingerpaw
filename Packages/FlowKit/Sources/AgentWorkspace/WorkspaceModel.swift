@@ -1,43 +1,40 @@
-import SwiftTerm
+import GhosttyTerminal
 import SwiftUI
 
-/// One agent session: a live PTY terminal running an agent CLI in a worktree.
+/// One agent session: a GPU-rendered Ghostty terminal running an agent CLI in a worktree.
 @MainActor
 final class AgentSession: Identifiable {
     let id = UUID()
     let kind: AgentKind?
-    let terminal: LocalProcessTerminalView
+    let terminal: TerminalView
 
     /// `kind == nil` → a plain interactive shell (no agent), launched in the worktree.
     /// `resume` → relaunch the agent continuing its last conversation in this directory.
     init(kind: AgentKind?, directory: String, prompt: String? = nil, resume: Bool = false) {
         self.kind = kind
         let command = resume ? (kind?.continueCommand ?? kind?.launch(prompt: prompt)) : kind?.launch(prompt: prompt)
-        self.terminal = makeTerminal(directory: directory, command: command)
+        self.terminal = makeGhosttyTerminal(directory: directory, command: command)
     }
 
     var title: String { kind?.title ?? "Terminal" }
 
-    func terminate() { terminal.terminate() }
+    /// Ghostty terminates the child process when its surface is freed (the view is released).
+    func terminate() {}
 
-    /// Type a prompt into the live agent and submit it. The Enter is sent as a separate
-    /// event after a short delay — Ink-based TUIs (Claude Code) drop a `\r` that arrives
-    /// in the same buffer as a large pasted block.
+    /// Type a prompt into the live agent and submit it. The Enter is a separate, delayed
+    /// event — Ink-based TUIs (Claude Code) drop a `\r` in the same buffer as a paste.
     func sendPrompt(_ text: String) {
-        terminal.send(txt: text)
+        terminal.sendText(text)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak terminal] in
-            terminal?.send(txt: "\r")
+            terminal?.sendText("\r")
         }
     }
 
-    /// Best-effort scrape of the visible terminal screen (raw rendered text).
+    /// Ghostty exposes selection reads, not a full-screen dump — handoff uses the
+    /// agent-authored path, so the scrape is best-effort empty.
     func snapshot(maxLines: Int) -> String {
-        let t = terminal.getTerminal()
-        let rows = t.rows, cols = t.cols
-        guard rows > 0, cols > 0 else { return "" }
-        let startRow = max(0, rows - maxLines)
-        return t.getText(start: Position(col: 0, row: startRow),
-                         end: Position(col: cols - 1, row: rows - 1))
+        _ = maxLines
+        return ""
     }
 }
 

@@ -331,7 +331,7 @@ struct WorkspaceRootView: View {
     private func terminalArea(_ ws: Workspace) -> some View {
         ZStack {
             ForEach(ws.sessions) { session in
-                TerminalHostView(terminal: session.terminal)
+                GhosttyHostView(terminal: session.terminal, isSelected: session.id == ws.selectedSessionID)
                     .opacity(session.id == ws.selectedSessionID ? 1 : 0)
                     .allowsHitTesting(session.id == ws.selectedSessionID)
             }

@@ -23,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", from: "1.0.0"),
         .package(url: "https://github.com/ml-explore/mlx-swift-examples", exact: "2.25.9"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0"),
+        .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "1.2.7"),  // SPIKE: Ghostty terminal
     ],
     targets: [
         .target(name: "AgentMCP"),
@@ -30,6 +31,7 @@ let package = Package(
         .target(name: "AgentWorkspace", dependencies: [
             "AgentMCP",
             .product(name: "SwiftTerm", package: "SwiftTerm"),
+            .product(name: "GhosttyTerminal", package: "libghostty-spm"),  // SPIKE
         ]),
         .target(name: "Settings"),
         .target(name: "Permissions"),
