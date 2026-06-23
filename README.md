@@ -4,6 +4,8 @@
 
 # GingerPaw
 
+[![Download for macOS](https://img.shields.io/github/v/release/Vikrant-Khedkar/gingerpaw?label=Download%20for%20macOS&style=for-the-badge&color=db7e14&logo=apple)](https://github.com/Vikrant-Khedkar/gingerpaw/releases/latest)
+
 **A multi-agent coding workspace for macOS — with on-device voice. Fully local.**
 
 Run a whole team of coding agents in parallel — Claude Code, Codex, Gemini CLI, Cursor —
@@ -11,14 +13,7 @@ each in its own git worktree. Agents can even spawn their own workspaces and lau
 agents. Plus push-to-talk dictation and a talking ginger cat that speaks (in a neural voice)
 when an agent finishes. Nothing ever leaves your Mac.
 
-<br/>
-
-### [⬇️ Download GingerPaw for macOS](https://github.com/Vikrant-Khedkar/gingerpaw/releases/latest)
-
-[![Latest release](https://img.shields.io/github/v/release/Vikrant-Khedkar/gingerpaw?label=download&style=for-the-badge&color=db7e14)](https://github.com/Vikrant-Khedkar/gingerpaw/releases/latest)
-
-macOS 14+ · Apple Silicon · self-contained (voice model bundled). Unsigned build — first launch:
-**right-click → Open**, or `xattr -dr com.apple.quarantine /Applications/GingerPaw.app`.
+<sub>macOS 14+ · Apple Silicon · self-contained (voice model bundled). Unsigned build — first launch: **right-click → Open**, or `xattr -dr com.apple.quarantine /Applications/GingerPaw.app`.</sub>
 
 <br/>
 
